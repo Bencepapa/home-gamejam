@@ -1,20 +1,69 @@
 {
-  "_comment": "Per-sprite render metadata for game.js's images{} map. anchor.x/anchor.y are fractions of the RAW image's own width/height (can go below 0 or above 1 -- the anchor editor no longer clamps this, since a tightly-cropped sprite's true ground-contact point can fall outside its own pixels). scale corrects sprites with baked-in padding. _room holds the plate's grid: originPx is grid (0,0)'s pixel location; axisX/axisY are the screen-space vector moved per +1 step along each grid axis, independently measured (not assumed symmetric) via tools/anchor_editor.html's 3-point calibration. tileW/tileH are kept only as a legacy fallback/reference.",
-
-  "crib":       { "anchor": { "x": 0.643, "y": 0.931 }, "scale": 1 },
-  "bed":        { "anchor": { "x": 0.578, "y": 1 },     "scale": 1 },
-  "nightstand": { "anchor": { "x": 0.596, "y": 1 },     "scale": 1 },
-  "wardrobe":   { "anchor": { "x": 0.653, "y": 1 },     "scale": 1 },
-  "watch":      { "anchor": { "x": 0.468, "y": 1 },     "scale": 1 },
-  "box1x1":     { "anchor": { "x": 0.494, "y": 0.995 }, "scale": 1 },
-  "box1x2":     { "anchor": { "x": 0.369, "y": 0.95 },  "scale": 1 },
-
   "_room": {
-    "originPx": { "x": 720, "y": 395 },
-    "gridN": 6,
-    "axisX": { "x": 96.667, "y": 43.333 },
-    "axisY": { "x": -104.167, "y": 42.5 },
-    "tileW": 200.83,
-    "tileH": 100.83
+    "originPx": {
+      "x": 723.3,
+      "y": 471.7
+    },
+    "gridN": 3,
+    "axisX": {
+      "x": -88.889,
+      "y": 42.5
+    },
+    "axisY": {
+      "x": 87.5,
+      "y": 42.222
+    },
+    "tileW": 176.39,
+    "tileH": 84.72
+  },
+  "_comment": "Per-sprite render metadata for game.js's images{} map. anchor.x/anchor.y are fractions of the RAW image's own width/height (can go below 0 or above 1 -- the anchor editor no longer clamps this, since a tightly-cropped sprite's true ground-contact point can fall outside its own pixels). scale corrects sprites with baked-in padding. _room holds the plate's grid: originPx is grid (0,0)'s pixel location; axisX/axisY are the screen-space vector moved per +1 step along each grid axis, independently measured (not assumed symmetric) via tools/anchor_editor.html's 3-point calibration. tileW/tileH are kept only as a legacy fallback/reference.",
+  "crib": {
+    "anchor": {
+      "x": 0.665,
+      "y": 0.949
+    },
+    "scale": 1
+  },
+  "bed": {
+    "anchor": {
+      "x": 0.629,
+      "y": 1.014
+    },
+    "scale": 1
+  },
+  "nightstand": {
+    "anchor": {
+      "x": 0.571,
+      "y": 1.022
+    },
+    "scale": 1
+  },
+  "wardrobe": {
+    "anchor": {
+      "x": 0.653,
+      "y": 1
+    },
+    "scale": 1
+  },
+  "watch": {
+    "anchor": {
+      "x": 0.457,
+      "y": 1.176
+    },
+    "scale": 1
+  },
+  "box1x1": {
+    "anchor": {
+      "x": 0.494,
+      "y": 0.995
+    },
+    "scale": 1
+  },
+  "box1x2": {
+    "anchor": {
+      "x": 0.369,
+      "y": 0.95
+    },
+    "scale": 1
   }
 }

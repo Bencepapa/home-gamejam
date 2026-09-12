@@ -79,12 +79,12 @@ function inBounds(x, y) {
 function makeEntities() {
   return [
     // --- anchor object: same physical crib in both eras ---
-    // grid mapping (per user's ASCII floor plan): text-row -> x (grows
-    // toward the door wall), text-column reversed -> y (column 0 is the
-    // "-y" / right-up side along the window wall, so my_y = 5 - Y_text).
+    // grid mapping (per user's corrected ASCII floor plan): origin sits at
+    // the top-right of the plan, +x grows LEFT (toward the window wall),
+    // +y grows DOWN (toward the door wall) -- i.e. x = 5 - column, y = row.
     {
-      id: 'crib', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
-      x: 3, y: 5, z: 0, height: 1,
+      id: 'crib', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
+      x: 5, y: 3, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'use', era: 'both', anchor: true,
       img: 'crib'
@@ -93,10 +93,11 @@ function makeEntities() {
     // --- past-only furniture (the parents' room as it was) ---
     {
       id: 'bed', cells: [
-        { dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: 2, dy: 0 },
-        { dx: 0, dy: 1 }, { dx: 1, dy: 1 }, { dx: 2, dy: 1 }
+        { dx: 0, dy: 0 }, { dx: 1, dy: 0 },
+        { dx: 0, dy: 1 }, { dx: 1, dy: 1 },
+        { dx: 0, dy: 2 }, { dx: 1, dy: 2 }
       ],
-      x: 0, y: 4, z: 0, height: 1,
+      x: 4, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
       img: 'bed',
@@ -104,14 +105,14 @@ function makeEntities() {
     },
     {
       id: 'nightstand', cells: [{ dx: 0, dy: 0 }],
-      x: 0, y: 3, z: 0, height: 1,
+      x: 3, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past', mirror: true,
       img: 'nightstand',
       lookText: 'Apa órája és a szemüvege szokott itt lenni esténként.'
     },
     {
-      id: 'wardrobe', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
+      id: 'wardrobe', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 0, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
@@ -129,7 +130,7 @@ function makeEntities() {
     // --- present-only: boxes filling the same footprint area ---
     {
       id: 'box_bed_1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
-      x: 1, y: 4, z: 0, height: 1,
+      x: 4, y: 1, z: 0, height: 1,
       push: 'axis', axis: 'y', blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x2',
@@ -137,7 +138,7 @@ function makeEntities() {
     },
     {
       id: 'box_nightstand', cells: [{ dx: 0, dy: 0 }],
-      x: 0, y: 3, z: 0, height: 1,
+      x: 3, y: 0, z: 0, height: 1,
       push: 'any', pull: true, blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x1',
@@ -153,7 +154,7 @@ function makeEntities() {
     },
     {
       id: 'box_wardrobe_2', cells: [{ dx: 0, dy: 0 }],
-      x: 1, y: 0, z: 0, height: 1,
+      x: 0, y: 1, z: 0, height: 1,
       push: 'any', pull: true, blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x1',
@@ -163,15 +164,15 @@ function makeEntities() {
 }
 
 let entities = [];
-let actor = { x: 5, y: 5, z: 0, facing: { x: -1, y: 0 } };
+let actor = { x: 5, y: 5, z: 0, facing: { x: 0, y: -1 } };
 let undoStack = [];
 let watchFound = false;
-const WATCH_SPOT = { x: 5, y: 2 };
+const WATCH_SPOT = { x: 1, y: 1 };
 
 function resetGame() {
   entities = makeEntities();
   era = 'present';
-  actor = { x: 5, y: 5, z: 0, facing: { x: -1, y: 0 } };
+  actor = { x: 5, y: 5, z: 0, facing: { x: 0, y: -1 } };
   undoStack = [];
   watchFound = false;
 }
