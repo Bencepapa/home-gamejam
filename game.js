@@ -340,18 +340,50 @@ function drawScene() {
   if (DEBUG_GRID) drawDebugGrid();
 }
 
-const BUMP_MS = 130; // decay time for the walk-into-it wobble
+const BUMP_MS = 130; // decay time for the walk-into-it (stationary) wobble
 
 function triggerBump(e, dir) {
   e.bumpT = 1;
   e.bumpDir = (dir && dir.x !== 0) ? Math.sign(dir.x) : 1;
 }
 
+// Slide animation for an entity that actually changed grid cell (pushed
+// box, rolled watch). e.x/e.y are already the new LOGICAL position by the
+// time this is called; we just remember where it visually came from and
+// ease the render position toward it over a short, distance-scaled time.
+// A watch rolling 2 cells in one push still gets ONE tween end to end,
+// not two chained ones, since fromX/fromY is always its pre-push cell.
+function startMoveAnim(e, fromX, fromY, dir) {
+  e.animFromX = fromX;
+  e.animFromY = fromY;
+  e.animT = 0;
+  const dist = Math.hypot(e.x - fromX, e.y - fromY) || 1;
+  e.animDurMs = 120 + dist * 40; // fast, a little longer for a 2-cell roll
+  e.animDir = (dir && dir.x !== 0) ? Math.sign(dir.x) : 1;
+}
+
 function drawEntity(e) {
+  let rx = e.x, ry = e.y;
+  let skew = 0;
+
+  if (e.bumpT > 0) {
+    e.bumpT = max(0, e.bumpT - deltaTime / BUMP_MS);
+    const eraFactor = era === 'past' ? 0.6 : 1; // the baby bumps things more gently
+    skew += sin(e.bumpT * PI) * 0.2 * eraFactor * (e.bumpDir || 1);
+  }
+  if (e.animT !== undefined && e.animT < 1) {
+    e.animT = min(1, e.animT + deltaTime / (e.animDurMs || 150));
+    const eased = 1 - pow(1 - e.animT, 3); // ease-out cubic
+    rx = lerp(e.animFromX, e.x, eased);
+    ry = lerp(e.animFromY, e.y, eased);
+    skew += sin(min(e.animT, 1) * PI) * 0.15 * (e.animDir || 1);
+  }
+  if (e.mirror) skew *= -1; // the mirror scale() below flips the shear too
+
   // unsliced sprite: anchor at the near (screen-lowest) corner of the
   // frontmost cell in its footprint, not the footprint's center.
   const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
-  const p = iso(e.x + front.dx + 1, e.y + front.dy + 1, e.z);
+  const p = iso(rx + front.dx + 1, ry + front.dy + 1, e.z);
   if (e.pixelOffset) { p.x += e.pixelOffset.x; p.y += e.pixelOffset.y; }
   const img = images[e.img];
   if (!img) return;
@@ -361,16 +393,10 @@ function drawEntity(e) {
   const ax = meta.anchor.x;
   const ay = meta.anchor.y;
 
-  if (e.bumpT > 0) e.bumpT = max(0, e.bumpT - deltaTime / BUMP_MS);
-
   push();
   translate(p.x, p.y);
   if (e.mirror) scale(-1, 1);
-  if (e.bumpT > 0) {
-    const eraFactor = era === 'past' ? 0.6 : 1; // the baby bumps things more gently
-    const skew = sin(e.bumpT * PI) * 0.2 * eraFactor * (e.bumpDir || 1);
-    drawingContext.transform(1, 0, skew, 1, 0, 0);
-  }
+  if (skew !== 0) drawingContext.transform(1, 0, skew, 1, 0, 0);
   imageMode(CORNER);
   const highlight = e.interact && state === STATE.PLAY && isFacingEntity(e);
   if (highlight) {
@@ -382,16 +408,33 @@ function drawEntity(e) {
   pop();
 }
 
+const WALK_MS = 220; // one totter cycle per completed step
+let actorWalk = { t: 1 };
+let actorStepParity = 1;
+function triggerWalk() {
+  actorWalk.t = 0;
+  actorStepParity *= -1; // alternate lean side each step, like a real gait
+}
+
 function drawActor() {
   const p = iso(actor.x + 0.5, actor.y + 0.5, actor.z); // feet at the cell's center, not its corner
   const isBaby = era === 'past';
   const bodyH = isBaby ? 34 : 160; // adult: 2.5x taller
   const bodyW = isBaby ? 26 : 51;  // adult: 1.5x wider
+
+  if (actorWalk.t < 1) actorWalk.t = min(1, actorWalk.t + deltaTime / WALK_MS);
+  const wob = actorWalk.t < 1 ? sin(actorWalk.t * PI) : 0;
+  const wobbleAmp = min(3, 160 / bodyH); // the smaller the body, the harder it totters
+
   push();
   translate(p.x, p.y);
   noStroke();
   fill(0, 0, 0, 90);
-  ellipse(0, -2, bodyW * 1.1, bodyW * 0.5);
+  ellipse(0, -2, bodyW * 1.1, bodyW * 0.5); // ground shadow stays put, doesn't wobble
+
+  rotate(radians(3.5) * wobbleAmp * actorStepParity * wob);
+  scale(1 + wob * 0.05 * wobbleAmp, 1 - wob * 0.05 * wobbleAmp); // slight x/y stretch-press
+
   fill(20, 18, 26);
   rectMode(CENTER);
   rect(0, -bodyH * 0.55, bodyW, bodyH, bodyW * 0.4);
@@ -563,12 +606,10 @@ function tryStep(dir, pulling) {
 
   const blocker = entityAt(tx, ty, actor.z, e => e.blocking);
   if (!blocker) {
-    if (standable(tx, ty, actor.z)) { actor.x = tx; actor.y = ty; }
-    else if (standable(tx, ty, actor.z + 1)) { actor.x = tx; actor.y = ty; actor.z = actor.z + 1; }
+    if (standable(tx, ty, actor.z)) { actor.x = tx; actor.y = ty; triggerWalk(); }
+    else if (standable(tx, ty, actor.z + 1)) { actor.x = tx; actor.y = ty; actor.z = actor.z + 1; triggerWalk(); }
     return;
   }
-
-  triggerBump(blocker, dir); // every object reacts to being walked into
 
   if (blocker.id === 'nightstand') onNightstandBump();
 
@@ -578,10 +619,14 @@ function tryStep(dir, pulling) {
   }
   if (canPush(blocker, dir)) {
     saveUndo();
+    const fromX = blocker.x, fromY = blocker.y;
     blocker.x += dir.x; blocker.y += dir.y;
+    startMoveAnim(blocker, fromX, fromY, dir); // it slides, so no separate bonk-in-place
     actor.x = tx; actor.y = ty;
+    triggerWalk();
+  } else {
+    triggerBump(blocker, dir); // didn't move: a stationary "bonk" reaction instead
   }
-  // else: blocked, just faced it (and bumped it, above)
 }
 
 function canPush(e, dir) {
@@ -607,8 +652,11 @@ function tryPull(dir) {
   const back = { x: actor.x - actor.facing.x, y: actor.y - actor.facing.y };
   if (!inBounds(back.x, back.y) || !standable(back.x, back.y, actor.z)) return;
   saveUndo();
+  const fromX = e.x, fromY = e.y;
   e.x += (actor.x - back.x); e.y += (actor.y - back.y);
+  startMoveAnim(e, fromX, fromY, { x: back.x - actor.x, y: back.y - actor.y });
   actor.x = back.x; actor.y = back.y;
+  triggerWalk();
 }
 
 function doInteract() {
@@ -653,31 +701,38 @@ function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
   // an obstruction (breaks). It doesn't need to travel the full distance
   // to succeed -- this also sidesteps needing the fall/goal cells to share
   // x/y parity, since any cell along the path can be the winning one.
+  const fromX = watch.x, fromY = watch.y;
   const midX = watch.x + dir.x, midY = watch.y + dir.y;
   const finalX = watch.x + dir.x * 2, finalY = watch.y + dir.y * 2;
 
   if (midX === WATCH_GOAL.x && midY === WATCH_GOAL.y) {
     watch.x = midX; watch.y = midY;
+    startMoveAnim(watch, fromX, fromY, dir);
     actor.x = actorTargetX; actor.y = actorTargetY;
+    triggerWalk();
     onWatchReachedGoal();
     return;
   }
 
   const midBlocked = !inBounds(midX, midY) || !!entityAt(midX, midY, watch.z, o => o.blocking && o !== watch);
-  if (midBlocked) { breakWatch(); return; }
+  if (midBlocked) { triggerBump(watch, dir); breakWatch(); return; }
 
   if (finalX === WATCH_GOAL.x && finalY === WATCH_GOAL.y) {
     watch.x = finalX; watch.y = finalY;
+    startMoveAnim(watch, fromX, fromY, dir);
     actor.x = actorTargetX; actor.y = actorTargetY;
+    triggerWalk();
     onWatchReachedGoal();
     return;
   }
 
   const finalBlocked = !inBounds(finalX, finalY) || !!entityAt(finalX, finalY, watch.z, o => o.blocking && o !== watch);
-  if (finalBlocked) { breakWatch(); return; }
+  if (finalBlocked) { triggerBump(watch, dir); breakWatch(); return; }
 
   watch.x = finalX; watch.y = finalY;
+  startMoveAnim(watch, fromX, fromY, dir);
   actor.x = actorTargetX; actor.y = actorTargetY;
+  triggerWalk();
 }
 
 function onWatchReachedGoal() {
@@ -709,6 +764,7 @@ function resetPastPuzzle() {
   watch.push = false;
   watch.pushDistance = 1;
   watch.bumpT = 0;
+  watch.animT = undefined; // cancel any slide it was mid-way through
   showToast('Az óra visszakerül az éjjeliszekrényre.');
 }
 
