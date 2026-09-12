@@ -72,7 +72,11 @@ const STRINGS = {
     quietRoomToast: "It's quiet. Just the room.",
     watchBreakToast: "That's not how it happened. How was it again?",
     watchResetToast: 'The watch is back on the nightstand.',
-    introFirstToast: 'A maze of boxes surrounds the crib in the middle. Somehow familiar.'
+    introFirstToast: 'A maze of boxes surrounds the crib in the middle. Somehow familiar.',
+    lookTV: 'My favorite game is Ice Climber.',
+    tvTouchToast: 'You touch the TV. The memory pulls you back.',
+    roomBedroom: 'Bedroom',
+    roomLiving: 'Living room'
   },
   hu: {
     title: 'HOME',
@@ -103,7 +107,11 @@ const STRINGS = {
     quietRoomToast: 'Csend van. Csak a szoba.',
     watchBreakToast: 'Nem így történt, hogy is volt?',
     watchResetToast: 'Az óra visszakerül az éjjeliszekrényre.',
-    introFirstToast: 'A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.'
+    introFirstToast: 'A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.',
+    lookTV: 'A kedvenc játékom az Ice Climber.',
+    tvTouchToast: 'Megérinted a tévét. Az emlék visszahúz.',
+    roomBedroom: 'Hálószoba',
+    roomLiving: 'Nappali'
   }
 };
 
@@ -168,7 +176,7 @@ function inBounds(x, y) {
    color (the "active" one) is decided dynamically by isColorAnchor().
 ------------------------------------------------- */
 
-function makeEntities() {
+function makeBedroomEntities() {
   return [
     // grid mapping (per user's corrected ASCII floor plan): origin sits at
     // the top-right of the plan, +x grows LEFT (toward the window wall),
@@ -273,6 +281,118 @@ function makeEntities() {
   ];
 }
 
+// ---- living room (nappali) -- layout only for now, per the user's grid
+// spec. Every piece still uses the bedroom's box1x1/box1x2 sprites as a
+// placeholder ("díszlet") until the real art lands; only id/cells/position
+// carry meaning yet. Wall convention matches the bedroom: y=0 is the
+// window wall (TV lives there), x=0 is the shelf/door wall (door opening
+// at y=4-5, below shelf2).
+function makeLivingEntities() {
+  return [
+    // the TV is this room's transition trigger/anchor, same role the crib
+    // plays in the bedroom -- split present/past for the same reason.
+    {
+      id: 'tv_present', cells: [{ dx: 0, dy: 0 }],
+      x: 3, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'use', era: 'present',
+      img: 'box1x1'
+    },
+    {
+      id: 'tv_past', cells: [{ dx: 0, dy: 0 }],
+      x: 3, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'look', era: 'past',
+      img: 'box1x1',
+      lookKey: 'lookTV'
+    },
+
+    // bookshelves, unchanged between eras for now (era: 'both') -- which
+    // one is "empty" vs "still full" is pending the real puzzle logic
+    { id: 'shelf1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+    { id: 'shelf2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 2, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+
+    // L-shaped couch (two pieces), coffee table in front of it, decor
+    { id: 'couch1', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 4, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+    { id: 'couch2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 5, y: 3, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+    { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 2, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+    { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 6, y: 1, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x1' },
+
+    // the pouf the kid pushes to the shelf and climbs -- past only for now
+    { id: 'puff', cells: [{ dx: 0, dy: 0 }], x: 1, y: 3, z: 0, height: 1,
+      push: 'any', blocking: true, stackable: true, interact: null, era: 'past', img: 'box1x1' },
+
+    // present-only clutter blocking the path to the TV
+    { id: 'box_living_1', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 1,
+      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
+    { id: 'box_living_2', cells: [{ dx: 0, dy: 0 }], x: 1, y: 1, z: 0, height: 1,
+      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
+    { id: 'box_living_3', cells: [{ dx: 0, dy: 0 }], x: 2, y: 5, z: 0, height: 1,
+      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' }
+  ];
+}
+
+// ---- room registry -- a lightweight stand-in for the corridor hub, which
+// doesn't exist yet. Press 1/2 in-game to switch (dev-only for now).
+const ROOMS = {
+  bedroom: {
+    gridN: 6, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
+    originPx: { x: 720, y: 395 },
+    plateImg: 'plate', lightmapImg: 'lightmap',
+    makeEntities: makeBedroomEntities,
+    spawn: { x: 0, y: 4, facing: { x: 1, y: 0 } }
+  },
+  living: {
+    // no measured plate yet -- reuses the bedroom's axis vectors as a
+    // placeholder until the real living-room plate is generated and
+    // measured via tools/anchor_editor.html
+    gridN: 7, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
+    originPx: { x: 720, y: 395 },
+    plateImg: null, lightmapImg: null,
+    makeEntities: makeLivingEntities,
+    spawn: { x: 1, y: 4, facing: { x: 1, y: 0 } }
+  }
+};
+let currentRoomId = 'bedroom';
+
+function applyRoomConfig(roomId) {
+  const cfg = ROOMS[roomId];
+  GRID_N = cfg.gridN;
+  AXIS_X = cfg.axisX;
+  AXIS_Y = cfg.axisY;
+  ORIGIN = cfg.originPx;
+  if (roomId === 'bedroom') {
+    // bedroom keeps its real, measured calibration from sprites.json,
+    // overriding the fallback values above when present
+    const room = spriteMeta._room;
+    if (room) {
+      if (room.originPx) ORIGIN = room.originPx;
+      if (room.gridN) GRID_N = room.gridN;
+      if (room.axisX && room.axisY) {
+        AXIS_X = room.axisX;
+        AXIS_Y = room.axisY;
+      } else if (room.tileW) {
+        const tw = room.tileW, th = room.tileH || room.tileW / 2;
+        AXIS_X = { x: tw / 2, y: th / 2 };
+        AXIS_Y = { x: -tw / 2, y: th / 2 };
+      }
+    }
+  }
+}
+
+function switchRoom(roomId) {
+  if (!ROOMS[roomId] || roomId === currentRoomId) return;
+  currentRoomId = roomId;
+  applyRoomConfig(roomId);
+  resetGame();
+}
+
 let entities = [];
 let actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
 let undoStack = [];
@@ -280,11 +400,12 @@ let watchFound = false;
 const WATCH_GOAL = { x: 0, y: 0 }; // under the wardrobe
 
 function resetGame() {
-  entities = makeEntities();
+  const cfg = ROOMS[currentRoomId];
+  entities = cfg.makeEntities();
   era = 'present';
-  actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
+  actor = { x: cfg.spawn.x, y: cfg.spawn.y, z: 0, facing: { ...cfg.spawn.facing } };
   undoStack = [];
-  watchFound = false;
+  watchFound = false; // only meaningful in the bedroom; harmless elsewhere
 }
 
 function activeEntities() {
@@ -320,22 +441,7 @@ function setup() {
   textFont('Georgia, serif');
   imageMode(CENTER);
   rectMode(CORNER);
-  const room = spriteMeta._room;
-  if (room) {
-    if (room.originPx) ORIGIN = room.originPx;
-    if (room.gridN) GRID_N = room.gridN;
-    if (room.axisX && room.axisY) {
-      // preferred: independently-measured per-axis vectors (see
-      // tools/anchor_editor.html's 3-point calibration)
-      AXIS_X = room.axisX;
-      AXIS_Y = room.axisY;
-    } else if (room.tileW) {
-      // legacy fallback: symmetric diamond derived from a single tile size
-      const tw = room.tileW, th = room.tileH || room.tileW / 2;
-      AXIS_X = { x: tw / 2, y: th / 2 };
-      AXIS_Y = { x: -tw / 2, y: th / 2 };
-    }
-  }
+  applyRoomConfig(currentRoomId);
   resetGame();
   buildDesaturatedPlate();
   buildDesaturatedSprites();
@@ -369,6 +475,7 @@ function buildDesaturatedSprites() {
 function isColorAnchor(e) {
   if (e.id === 'crib_present') return !watchFound;
   if (e.id === 'wardrobe_present') return watchFound;
+  if (e.id === 'tv_present') return true; // TODO: gate on a "solved" flag once the room's puzzle exists
   return false;
 }
 
@@ -478,9 +585,19 @@ function lightmapAlpha() {
 }
 
 function drawScene() {
-  const plateImg = (era === 'present') ? plateDesat : images.plate;
-  imageMode(CENTER);
-  image(plateImg, DESIGN_W / 2, DESIGN_H / 2);
+  const room = ROOMS[currentRoomId];
+  const rawPlate = room.plateImg ? images[room.plateImg] : null;
+  const plateImg = (era === 'present' && rawPlate === images.plate) ? plateDesat : rawPlate;
+  if (plateImg) {
+    imageMode(CENTER);
+    image(plateImg, DESIGN_W / 2, DESIGN_H / 2);
+  } else {
+    // no plate art yet for this room -- flat floor + grid so the layout
+    // is checkable before the real plate exists (see ROOMS.living)
+    fill(40, 36, 30);
+    rect(0, 0, DESIGN_W, DESIGN_H);
+    drawDebugGrid();
+  }
 
   const drawables = [];
 
@@ -501,12 +618,14 @@ function drawScene() {
   // lightmap glow -- flickers gently: two faster sines dither the opacity,
   // a third, slow, big-amplitude sine drifts it up and down like a breath.
   // All phases start at 0, so alpha(0) == LIGHTMAP_BASE exactly.
-  push();
-  tint(255, 255, 255, lightmapAlpha() * 255);
-  imageMode(CENTER);
-  image(images.lightmap, DESIGN_W / 2, DESIGN_H / 2);
-  noTint();
-  pop();
+  if (room.lightmapImg && images[room.lightmapImg]) {
+    push();
+    tint(255, 255, 255, lightmapAlpha() * 255);
+    imageMode(CENTER);
+    image(images[room.lightmapImg], DESIGN_W / 2, DESIGN_H / 2);
+    noTint();
+    pop();
+  }
 
   if (DEBUG_GRID) drawDebugGrid();
 }
@@ -723,11 +842,14 @@ let undoButton = null;
 function drawHUD() {
   push();
   fill(0, 0, 0, 130);
-  rect(12, 12, 220, 36, 8);
-  fill(255, 235, 210);
+  rect(12, 12, 220, 54, 8);
+  fill(200, 190, 175);
   textAlign(LEFT, CENTER);
+  textSize(12);
+  text(currentRoomId === 'living' ? t('roomLiving') : t('roomBedroom'), 22, 26);
+  fill(255, 235, 210);
   textSize(16);
-  text(era === 'present' ? t('eraPresent') : t('eraPast'), 22, 30);
+  text(era === 'present' ? t('eraPresent') : t('eraPast'), 22, 47);
 
   const bw = 90, bh = 60;
   const bx = 12, by = DESIGN_H - bh - 16;
@@ -857,6 +979,9 @@ function keyPressed() {
     return;
   }
   if (state !== STATE.PLAY || transitioning) return;
+  // dev-only room switch, stands in for the corridor hub until it exists
+  if (key === '1') { switchRoom('bedroom'); return; }
+  if (key === '2') { switchRoom('living'); return; }
   if (['ArrowRight', 'd', 'D'].includes(key)) tryStep(DIRS.right, keyIsDown(16));
   else if (['ArrowLeft', 'a', 'A'].includes(key)) tryStep(DIRS.left, keyIsDown(16));
   else if (['ArrowDown', 's', 'S'].includes(key)) tryStep(DIRS.down, keyIsDown(16));
@@ -975,6 +1100,15 @@ function doInteract() {
     } else {
       showToast(t('wardrobeSearchToast'));
     }
+    return;
+  }
+  if (e.id === 'tv_present') {
+    // no "already solved" guard yet -- the room's puzzle isn't wired up,
+    // this just proves the transition works with a second room's entities
+    showToast(t('tvTouchToast'));
+    startEraTransition('past', () => {
+      actor.x = 3; actor.y = 3; actor.facing = { x: 0, y: -1 }; // facing the TV/table
+    });
     return;
   }
   if (e.interact === 'look' && e.lookKey) {
