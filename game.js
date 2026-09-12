@@ -40,6 +40,88 @@ let plateDesat = null; // cached desaturated plate for present era
 
 const DEFAULT_SPRITE_META = { anchor: { x: 0.5, y: 0.9 }, scale: 1 };
 
+/* ---------------- I18N ---------------- */
+
+const STRINGS = {
+  en: {
+    title: 'HOME',
+    subtitle: "Your parents' old bedroom. You left something in there.",
+    enter: 'Enter',
+    enterHint: 'Click, or press Space / Enter',
+    eraPresent: 'Present — the room, now',
+    eraPast: 'Past — the memory',
+    undo: 'undo',
+    interact: 'interact',
+    winTitle: "You found dad's watch.",
+    winSubtitle: "That's it. I found my way home.",
+    lookBed: "My parents' bed. I used to crawl in here after a bad dream.",
+    lookNightstand: "Dad's watch and glasses used to sit here every evening.",
+    lookWardrobe: 'I hide in here when mom is angry.',
+    lookBoxBed: "Mom's clothes, folded neatly. No one has ever seen this.",
+    lookBoxNightstand: "Dad's drawer, emptied out. His watch isn't here. It never turned up.",
+    alreadyRemember: 'I already remember.',
+    touchCribToast: 'You touch the crib. The memory pulls you back.',
+    cribPastToast: 'My own crib. Strange, seeing it from here.',
+    wardrobeFoundToast: 'The watch. There it is, where the baby rolled it.',
+    wardrobeSearchToast: "The old wardrobe. I'm looking for something in it, but I don't know what.",
+    watchFallToast: 'The watch tumbles off the nightstand...',
+    watchHitsCribToast: '...and rolls straight into the crib.',
+    watchRollsToast: '...and rolls off toward the bed.',
+    watchGoalToast: 'The watch rolls under the wardrobe.',
+    babyCriesToast: 'The baby starts crying.',
+    quietRoomToast: "It's quiet. Just the room.",
+    watchBreakToast: "That's not how it happened. How was it again?",
+    watchResetToast: 'The watch is back on the nightstand.',
+    introFirstToast: 'A maze of boxes surrounds the crib in the middle. Somehow familiar.'
+  },
+  hu: {
+    title: 'HOME',
+    subtitle: 'A szülők egykori hálószobája. Valamit ott hagytál benne.',
+    enter: 'Belépek',
+    enterHint: 'Kattints, vagy nyomj Space / Entert',
+    eraPresent: 'Jelen — a szoba most',
+    eraPast: 'Múlt — az emlék',
+    undo: 'vissza',
+    interact: 'interakció',
+    winTitle: 'Megtaláltad apa óráját.',
+    winSubtitle: 'Ennyi volt. Hazataláltam.',
+    lookBed: 'A szüleim ágya. Ide bújtam be, ha rosszat álmodtam.',
+    lookNightstand: 'Apa órája és a szemüvege szokott itt lenni esténként.',
+    lookWardrobe: 'Ide bújok, ha anya mérges.',
+    lookBoxBed: 'Anya ruhái, gondosan összehajtva. Sose látta ezt még senki.',
+    lookBoxNightstand: 'Apa fiókjának tartalma. Az órája nincs itt. Sosem került elő.',
+    alreadyRemember: 'Már emlékszem.',
+    touchCribToast: 'Megérinted a bölcsőt. Az emlék visszahúz.',
+    cribPastToast: 'A saját bölcsőm. Furcsa innen nézni.',
+    wardrobeFoundToast: 'Az óra. Ott van, ahová a baba begörgette.',
+    wardrobeSearchToast: 'A régi szekrény. Valamit keresek benne, de nem tudom, mit.',
+    watchFallToast: 'Az óra lepottyan az éjjeliszekrényről...',
+    watchHitsCribToast: '...és nekigurul a bölcsőnek.',
+    watchRollsToast: '...és odagurul az ágy mellé.',
+    watchGoalToast: 'Az óra begördül a szekrény alá.',
+    babyCriesToast: 'A baba felsír.',
+    quietRoomToast: 'Csend van. Csak a szoba.',
+    watchBreakToast: 'Nem így történt, hogy is volt?',
+    watchResetToast: 'Az óra visszakerül az éjjeliszekrényre.',
+    introFirstToast: 'A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.'
+  }
+};
+
+function detectLang() {
+  try {
+    const saved = localStorage.getItem('home_lang');
+    if (saved === 'en' || saved === 'hu') return saved;
+  } catch (e) { /* localStorage unavailable -- fall through to autodetect */ }
+  return (navigator.language || '').toLowerCase().startsWith('hu') ? 'hu' : 'en';
+}
+
+let lang = detectLang();
+function t(key) { return (STRINGS[lang] && STRINGS[lang][key]) || STRINGS.en[key] || key; }
+function setLang(l) {
+  lang = l;
+  try { localStorage.setItem('home_lang', l); } catch (e) { /* ignore */ }
+}
+
 /* ---------------- ASSETS ---------------- */
 
 function preload() {
@@ -123,7 +205,7 @@ function makeEntities() {
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
       img: 'bed',
-      lookText: 'A szüleim ágya. Ide bújtam be, ha rosszat álmodtam.'
+      lookKey: 'lookBed'
     },
     {
       id: 'nightstand', cells: [{ dx: 0, dy: 0 }],
@@ -131,7 +213,7 @@ function makeEntities() {
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past', mirror: true,
       img: 'nightstand',
-      lookText: 'Apa órája és a szemüvege szokott itt lenni esténként.'
+      lookKey: 'lookNightstand'
     },
     {
       id: 'wardrobe', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
@@ -139,7 +221,7 @@ function makeEntities() {
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
       img: 'wardrobe',
-      lookText: 'Ide bújok, ha anya mérges.'
+      lookKey: 'lookWardrobe'
     },
     {
       // sits visually on the nightstand until it's knocked off (see
@@ -166,7 +248,7 @@ function makeEntities() {
       push: 'axis', axis: 'x', blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x2',
-      lookText: 'Anya ruhái, gondosan összehajtva. Sose látta ezt még senki.'
+      lookKey: 'lookBoxBed'
     },
     {
       id: 'box_nightstand', cells: [{ dx: 0, dy: 0 }],
@@ -174,7 +256,7 @@ function makeEntities() {
       push: 'any', pull: true, blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x1',
-      lookText: 'Apa fiókjának tartalma. Az órája nincs itt. Sosem került elő.'
+      lookKey: 'lookBoxNightstand'
     },
     {
       // the actual wardrobe, not boxes -- it stayed exactly where it stood
@@ -338,21 +420,47 @@ function drawIntro() {
   textAlign(CENTER, CENTER);
   fill(255, 236, 200);
   textSize(52);
-  text('HOME', DESIGN_W / 2, DESIGN_H / 2 - 160);
+  text(t('title'), DESIGN_W / 2, DESIGN_H / 2 - 160);
   fill(230);
   textSize(20);
-  text('A szülők egykori hálószobája. Valamit ott hagytál benne.', DESIGN_W / 2, DESIGN_H / 2 - 90);
+  text(t('subtitle'), DESIGN_W / 2, DESIGN_H / 2 - 90);
 
-  const bw = 260, bh = 60;
-  const bx = DESIGN_W / 2 - bw / 2, by = DESIGN_H / 2 - 30;
+  // a plain, understated prompt instead of a generic filled button -- fits
+  // the antique/melancholy tone better than a rounded-rect UI widget
+  const label = t('enter');
+  textSize(26);
+  const tw = textWidth(label);
+  const cx = DESIGN_W / 2, cy = DESIGN_H / 2 + 10;
+  const bw = tw + 80, bh = 56; // generous click/tap target around the text
+  const bx = cx - bw / 2, by = cy - bh / 2;
   const hover = pointInRect(mouseDesign(), bx, by, bw, bh);
-  fill(hover ? color(255, 200, 120) : color(230, 170, 90));
-  rect(bx, by, bw, bh, 12);
-  fill(30, 20, 10);
-  textSize(22);
-  text('Belépek', DESIGN_W / 2, by + bh / 2 + 2);
+  fill(hover ? color(255, 230, 190) : color(220, 195, 160));
+  text(label, cx, cy);
+  stroke(hover ? color(255, 230, 190) : color(220, 195, 160));
+  strokeWeight(1.5);
+  line(cx - tw / 2 - 14, cy + 22, cx + tw / 2 + 14, cy + 22);
+  noStroke();
+  fill(170);
+  textSize(13);
+  text(t('enterHint'), cx, cy + 50);
   introButton = { x: bx, y: by, w: bw, h: bh };
+
+  drawLangToggle();
   pop();
+}
+
+let langButton = null;
+function drawLangToggle() {
+  const bw = 64, bh = 32;
+  const bx = DESIGN_W - bw - 24, by = 24;
+  const hov = pointInRect(mouseDesign(), bx, by, bw, bh);
+  fill(hov ? color(255, 255, 255, 55) : color(255, 255, 255, 22));
+  rect(bx, by, bw, bh, 6);
+  fill(230);
+  textAlign(CENTER, CENTER);
+  textSize(14);
+  text(lang === 'hu' ? 'EN' : 'HU', bx + bw / 2, by + bh / 2 + 1);
+  langButton = { x: bx, y: by, w: bw, h: bh };
 }
 
 /* ---------------- SCENE ---------------- */
@@ -606,7 +714,7 @@ function drawHUD() {
   fill(255, 235, 210);
   textAlign(LEFT, CENTER);
   textSize(16);
-  text(era === 'present' ? 'Jelen — a szoba most' : 'Múlt — az emlék', 22, 30);
+  text(era === 'present' ? t('eraPresent') : t('eraPast'), 22, 30);
 
   const bw = 90, bh = 60;
   const bx = 12, by = DESIGN_H - bh - 16;
@@ -618,7 +726,7 @@ function drawHUD() {
   textSize(28);
   text('↺', bx + bw / 2, by + bh / 2 - 4);
   textSize(11);
-  text('vissza', bx + bw / 2, by + bh / 2 + 20);
+  text(t('undo'), bx + bw / 2, by + bh / 2 + 20);
   undoButton = { x: bx, y: by, w: bw, h: bh };
 
   // mobile action button
@@ -629,8 +737,10 @@ function drawHUD() {
   circle(abx + abw / 2, aby + abh / 2, abw);
   fill(30, 20, 10);
   textSize(14);
-  text('interakció', abx + abw / 2, aby + abh / 2);
+  text(t('interact'), abx + abw / 2, aby + abh / 2);
   actionButton = { x: abx, y: aby, w: abw, h: abh };
+
+  drawLangToggle();
   pop();
 }
 
@@ -678,10 +788,10 @@ function drawWinOverlay() {
   textAlign(CENTER, CENTER);
   fill(255, 236, 200);
   textSize(40);
-  text('Megtaláltad apa óráját.', DESIGN_W / 2, DESIGN_H / 2 - 20);
+  text(t('winTitle'), DESIGN_W / 2, DESIGN_H / 2 - 20);
   fill(220);
   textSize(16);
-  text('(demó vége — a hálószoba-jelenet)', DESIGN_W / 2, DESIGN_H / 2 + 16);
+  text(t('winSubtitle'), DESIGN_W / 2, DESIGN_H / 2 + 16);
 }
 
 /* ---------------- TOAST ---------------- */
@@ -699,14 +809,19 @@ function drawToast() {
   const alpha = constrain(toast.t / toast.dur, 0, 1) * 255;
   push();
   textAlign(CENTER, CENTER);
-  textSize(19);
+  textSize(38); // 2x the original 19
   textWrap(WORD);
-  const w = 700;
-  const bx = DESIGN_W / 2 - w / 2, by = DESIGN_H - 130, bh = 70;
+  const w = 1100;
+  const pad = 30;
+  const bx = DESIGN_W / 2 - w / 2, by = DESIGN_H - 190, bh = 130;
   fill(0, 0, 0, alpha * 0.72);
   rect(bx, by, w, bh, 10);
   fill(255, 240, 220, alpha);
-  text(toast.text, DESIGN_W / 2, by + bh / 2, w - 40);
+  // p5's text(str,x,y,width,height) anchors (x,y) at the box's TOP-LEFT
+  // corner regardless of textAlign, so x must be the box's left edge (not
+  // the design-space center) or a wide wrap box drifts off-canvas to the
+  // right -- CENTER alignment still centers each wrapped line within it.
+  text(toast.text, bx + pad, by + bh / 2, w - pad * 2);
   pop();
 }
 
@@ -724,12 +839,22 @@ const DIRS = {
 };
 
 function keyPressed() {
+  if (state === STATE.INTRO) {
+    if (key === ' ' || keyCode === ENTER) startGame();
+    return;
+  }
   if (state !== STATE.PLAY || transitioning) return;
   if (['ArrowRight', 'd', 'D'].includes(key)) tryStep(DIRS.right, keyIsDown(16));
   else if (['ArrowLeft', 'a', 'A'].includes(key)) tryStep(DIRS.left, keyIsDown(16));
   else if (['ArrowDown', 's', 'S'].includes(key)) tryStep(DIRS.down, keyIsDown(16));
   else if (['ArrowUp', 'w', 'W'].includes(key)) tryStep(DIRS.up, keyIsDown(16));
-  else if (key === ' ') doInteract();
+  else if (key === ' ' || keyCode === ENTER || ['z', 'Z', 'y', 'Y', 'x', 'X'].includes(key)) doInteract();
+}
+
+function startGame() {
+  state = STATE.PLAY;
+  resetGame();
+  showToast(t('introFirstToast'));
 }
 
 function tryStep(dir, pulling) {
@@ -812,10 +937,10 @@ function doInteract() {
     if (watchFound) {
       // the memory's already been relived and resolved -- touching the
       // crib again shouldn't keep re-opening the flashback
-      showToast('Már emlékszem.');
+      showToast(t('alreadyRemember'));
       return;
     }
-    showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
+    showToast(t('touchCribToast'));
     // the flashback opens with the baby climbing out of the wardrobe,
     // regardless of where the adult was standing in the present -- the
     // reposition happens as the transition's own action, exactly when the
@@ -827,20 +952,20 @@ function doInteract() {
     return;
   }
   if (e.id === 'crib_past') {
-    showToast('A saját bölcsőm. Furcsa innen nézni.');
+    showToast(t('cribPastToast'));
     return;
   }
   if (e.id === 'wardrobe_present') {
     if (watchFound) {
-      showToast('Az óra. Ott van, ahová a baba begörgette.');
+      showToast(t('wardrobeFoundToast'));
       state = STATE.WIN;
     } else {
-      showToast('A régi szekrény. Valamit keresek benne, de nem tudom, mit.');
+      showToast(t('wardrobeSearchToast'));
     }
     return;
   }
-  if (e.interact === 'look' && e.lookText) {
-    showToast(e.lookText);
+  if (e.interact === 'look' && e.lookKey) {
+    showToast(t(e.lookKey));
     return;
   }
 }
@@ -859,7 +984,7 @@ function onNightstandBump() {
   watch.attachedTo = null; // detach -- render from its own grid cell from now on
   watch.x = nightstand.x; watch.y = nightstand.y; // phase 1: drop straight down, still on the nightstand's cell
   watch.dropT = 1;
-  showToast('Az óra lepottyan az éjjeliszekrényről...');
+  showToast(t('watchFallToast'));
 
   setTimeout(() => {
     // phase 2: it rolls toward (3,2) -- but that's also crib_past's own
@@ -870,10 +995,10 @@ function onNightstandBump() {
     watch.x = 3; watch.y = 2;
     startMoveAnim(watch, fromX, fromY, null, ROLL_MS);
     if (blocked) {
-      showToast('...és nekigurul a bölcsőnek.');
+      showToast(t('watchHitsCribToast'));
       setTimeout(() => { triggerBump(watch, { x: 0, y: 0 }); breakWatch(); }, ROLL_MS - 100);
     } else {
-      showToast('...és odagurul az ágy mellé.');
+      showToast(t('watchRollsToast'));
     }
   }, DROP_MS);
 }
@@ -922,20 +1047,20 @@ function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
 
 function onWatchReachedGoal() {
   watchFound = true; // the wardrobe_present interaction checks this
-  showToast('Az óra begördül a szekrény alá.');
+  showToast(t('watchGoalToast'));
   setTimeout(() => {
-    showToast('A baba felsír.');
+    showToast(t('babyCriesToast'));
     setTimeout(() => {
       startEraTransition('present', () => {
         actor.x = 0; actor.y = 4; actor.facing = { x: 1, y: 0 };
       });
-      setTimeout(() => showToast('Csend van. Csak a szoba.'), 900);
+      setTimeout(() => showToast(t('quietRoomToast')), 900);
     }, 1400);
   }, 900);
 }
 
 function breakWatch() {
-  showToast('Nem így történt, hogy is volt?', 5); // held longer -- give it time to read
+  showToast(t('watchBreakToast'), 5); // held longer -- give it time to read
   setTimeout(() => {
     startEraTransition(null, resetPastPuzzle); // fade out, reset while hidden, fade back in
   }, 1100);
@@ -953,7 +1078,7 @@ function resetPastPuzzle() {
   watch.bumpT = 0;
   watch.dropT = 0;
   watch.animT = undefined; // cancel any slide it was mid-way through
-  showToast('Az óra visszakerül az éjjeliszekrényre.');
+  showToast(t('watchResetToast'));
 }
 
 function saveUndo() {
@@ -997,11 +1122,13 @@ function touchEnded() {
 
 function handlePress(px, py) {
   const p = toDesign(px, py);
+  if (langButton && pointInRect(p, langButton.x, langButton.y, langButton.w, langButton.h)) {
+    setLang(lang === 'hu' ? 'en' : 'hu');
+    return;
+  }
   if (state === STATE.INTRO) {
     if (introButton && pointInRect(p, introButton.x, introButton.y, introButton.w, introButton.h)) {
-      state = STATE.PLAY;
-      resetGame();
-      showToast('A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.');
+      startGame();
     }
     return;
   }
