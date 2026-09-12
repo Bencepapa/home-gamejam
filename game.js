@@ -126,7 +126,7 @@ function makeEntities() {
       id: 'watch', cells: [{ dx: 0, dy: 0 }],
       x: 3, y: 0, z: 0, height: 0.2,
       push: false, blocking: false, stackable: false, fallen: false,
-      pixelOffset: { x: 100, y: -25 },
+      pixelOffset: { x: -25, y: 100 },
       interact: null, era: 'past',
       img: 'watch'
     },
@@ -647,36 +647,51 @@ function onNightstandBump() {
 }
 
 function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
+  // The watch rolls along its path (up to 2 cells) and stops at the FIRST
+  // of: the goal cell (vanishes under the wardrobe, even one cell early
+  // and even if the full 2-cell distance would've overshot the wall), or
+  // an obstruction (breaks). It doesn't need to travel the full distance
+  // to succeed -- this also sidesteps needing the fall/goal cells to share
+  // x/y parity, since any cell along the path can be the winning one.
   const midX = watch.x + dir.x, midY = watch.y + dir.y;
   const finalX = watch.x + dir.x * 2, finalY = watch.y + dir.y * 2;
-  const reachedGoal = finalX === WATCH_GOAL.x && finalY === WATCH_GOAL.y;
 
-  if (!inBounds(finalX, finalY)) { breakWatch(); return; } // hit the wall
-
-  const midBlocked = !!entityAt(midX, midY, watch.z, o => o.blocking && o !== watch);
-  const finalBlocked = !!entityAt(finalX, finalY, watch.z, o => o.blocking && o !== watch);
-
-  if (midBlocked || (finalBlocked && !reachedGoal)) {
-    breakWatch();
+  if (midX === WATCH_GOAL.x && midY === WATCH_GOAL.y) {
+    watch.x = midX; watch.y = midY;
+    actor.x = actorTargetX; actor.y = actorTargetY;
+    onWatchReachedGoal();
     return;
   }
 
+  const midBlocked = !inBounds(midX, midY) || !!entityAt(midX, midY, watch.z, o => o.blocking && o !== watch);
+  if (midBlocked) { breakWatch(); return; }
+
+  if (finalX === WATCH_GOAL.x && finalY === WATCH_GOAL.y) {
+    watch.x = finalX; watch.y = finalY;
+    actor.x = actorTargetX; actor.y = actorTargetY;
+    onWatchReachedGoal();
+    return;
+  }
+
+  const finalBlocked = !inBounds(finalX, finalY) || !!entityAt(finalX, finalY, watch.z, o => o.blocking && o !== watch);
+  if (finalBlocked) { breakWatch(); return; }
+
   watch.x = finalX; watch.y = finalY;
   actor.x = actorTargetX; actor.y = actorTargetY;
+}
 
-  if (reachedGoal) {
-    showToast('Az óra begördül a szekrény alá.');
+function onWatchReachedGoal() {
+  showToast('Az óra begördül a szekrény alá.');
+  setTimeout(() => {
+    showToast('A baba felsír.');
     setTimeout(() => {
-      showToast('A baba felsír.');
+      startEraTransition('present');
       setTimeout(() => {
-        startEraTransition('present');
-        setTimeout(() => {
-          actor.x = 0; actor.y = 4; actor.facing = { x: 1, y: 0 };
-          showToast('Csend van. Csak a szoba.');
-        }, 900);
-      }, 1400);
-    }, 900);
-  }
+        actor.x = 0; actor.y = 4; actor.facing = { x: 1, y: 0 };
+        showToast('Csend van. Csak a szoba.');
+      }, 900);
+    }, 1400);
+  }, 900);
 }
 
 function breakWatch() {
@@ -689,7 +704,7 @@ function resetPastPuzzle() {
   if (!watch) return;
   watch.fallen = false;
   watch.x = 3; watch.y = 0;
-  watch.pixelOffset = { x: 100, y: -25 };
+  watch.pixelOffset = { x: -25, y: 100 };
   watch.blocking = false;
   watch.push = false;
   watch.pushDistance = 1;
