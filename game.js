@@ -91,10 +91,22 @@ function makeEntities() {
     // the top-right of the plan, +x grows LEFT (toward the window wall),
     // +y grows DOWN (toward the door wall) -- i.e. x = 5 - column, y = row.
     {
-      id: 'crib', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
+      // Two separate entities, not one era:'both' one -- the present and
+      // past puzzles must never share mutable state. Pushing the crib
+      // around in the past (the baby's doing) must not move "the crib" in
+      // the present, and vice versa, even though it's visually the same
+      // object. Both are still 'anchor' so neither desaturates.
+      id: 'crib_present', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
+      x: 3, y: 2, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, // fixed -- it's just the thing you touch
+      interact: 'use', era: 'present', anchor: true,
+      img: 'crib'
+    },
+    {
+      id: 'crib_past', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 3, y: 2, z: 0, height: 1,
       push: 'any', blocking: true, stackable: false, // the baby can shove it around the room
-      interact: 'use', era: 'both', anchor: true,
+      interact: 'use', era: 'past', anchor: true,
       img: 'crib'
     },
 
@@ -743,7 +755,7 @@ function doInteract() {
   if (!e) return;
   triggerTouch();
 
-  if (e.id === 'crib' && era === 'present') {
+  if (e.id === 'crib_present') {
     showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
     startEraTransition('past');
     // the flashback opens with the baby climbing out of the wardrobe,
@@ -753,7 +765,7 @@ function doInteract() {
     }, 900);
     return;
   }
-  if (e.id === 'crib' && era === 'past') {
+  if (e.id === 'crib_past') {
     showToast('A saját bölcsőm. Furcsa innen nézni.');
     return;
   }
@@ -780,11 +792,15 @@ function onNightstandBump() {
   showToast('Az óra lepottyan az éjjeliszekrényről...');
 
   setTimeout(() => {
-    // phase 2: once it's landed, it rolls to where it comes to rest
+    // phase 2: once it's landed, it rolls to where it comes to rest -- (4,3)
+    // has the SAME depth key as the bed's front cell, so the stable sort
+    // (bed defined earlier in the entities array) always draws the watch
+    // after/on top of it; anywhere with a strictly lower depth risked
+    // being painted over by the bed's oversized sprite bounding box.
     const fromX = watch.x, fromY = watch.y;
-    watch.x = 3; watch.y = 1; // just below the nightstand, clear of the (moved) crib
+    watch.x = 4; watch.y = 3;
     startMoveAnim(watch, fromX, fromY);
-    showToast('...és odagurul a padlóra.');
+    showToast('...és odagurul az ágy mellé.');
   }, DROP_MS);
 }
 
