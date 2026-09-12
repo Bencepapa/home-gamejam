@@ -51,6 +51,14 @@ function preload() {
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
   images.box1x2 = loadImage('assets/sprites/doboz_1x2.png');
+  for (const ch of ['man30', 'kid2']) {
+    for (const dir of ['ne', 'se']) {
+      for (const pose of ['stand', 'touch']) {
+        const key = `${ch}_${dir}_${pose}`;
+        images[key] = loadImage(`assets/sprites/${key}.png`);
+      }
+    }
+  }
   spriteMeta = loadJSON('assets/sprites.json');
 }
 
@@ -314,9 +322,9 @@ const LIGHTMAP_MAX = 0.50;
 
 function lightmapAlpha() {
   const t = millis() * 0.001;
-  const slowBreath = 0.10 * sin(t * 0.05);  // big amplitude, very slow -- the "breathing"
-  const medWave = 0.06 * sin(t * 0.3);      // slower flicker
-  const fastWave = 0.03 * sin(t * 1.1);     // faster flicker
+  const slowBreath = 0.30 * sin(t * 0.05);  // big amplitude, very slow -- the "breathing"
+  const medWave = 0.15 * sin(t * 0.3);      // slower flicker
+  const fastWave = 0.1 * sin(t * 1.1);     // faster flicker
   return constrain(LIGHTMAP_BASE + slowBreath + medWave + fastWave, LIGHTMAP_MIN, LIGHTMAP_MAX);
 }
 
@@ -430,33 +438,53 @@ function triggerWalk() {
   actorStepParity *= -1; // alternate lean side each step, like a real gait
 }
 
+// Only NE and SE are real art; NW/SW are the mirror images of them. The
+// grid's two axes each point at one screen diagonal (see AXIS_X/AXIS_Y),
+// so the four possible single-axis facings map onto exactly these four.
+function facingToSpriteDir(facing) {
+  if (facing.x === -1) return { dir: 'ne', mirror: false };
+  if (facing.x === 1) return { dir: 'se', mirror: true };
+  if (facing.y === 1) return { dir: 'se', mirror: false };
+  if (facing.y === -1) return { dir: 'ne', mirror: true };
+  return { dir: 'se', mirror: false };
+}
+
+const TOUCH_MS = 450; // how long the touch pose holds after an interaction
+let actorTouchT = 0;
+function triggerTouch() { actorTouchT = TOUCH_MS; }
+
 function drawActor() {
   const p = iso(actor.x + 0.5, actor.y + 0.5, actor.z); // feet at the cell's center, not its corner
   const isBaby = era === 'past';
-  const bodyH = isBaby ? 34 : 160; // adult: 2.5x taller
-  const bodyW = isBaby ? 26 : 51;  // adult: 1.5x wider
 
   if (actorWalk.t < 1) actorWalk.t = min(1, actorWalk.t + deltaTime / WALK_MS);
   const wob = actorWalk.t < 1 ? sin(actorWalk.t * PI) : 0;
-  const wobbleAmp = min(3, 160 / bodyH); // the smaller the body, the harder it totters
+  if (actorTouchT > 0) actorTouchT = max(0, actorTouchT - deltaTime);
+  const wobbleAmp = isBaby ? 3 : 1; // the smaller kid totters harder than the adult
+
+  const character = isBaby ? 'kid2' : 'man30';
+  const pose = actorTouchT > 0 ? 'touch' : 'stand';
+  const { dir, mirror } = facingToSpriteDir(actor.facing);
+  const key = `${character}_${dir}_${pose}`;
+  const img = images[key];
+  if (!img) return;
+  const meta = metaFor(key); // scale is 1 here -- sprites are already sized 1:1 to the grid
+  const w = img.width * meta.scale;
+  const h = img.height * meta.scale;
 
   push();
   translate(p.x, p.y);
   noStroke();
   fill(0, 0, 0, 90);
-  ellipse(0, -2, bodyW * 1.1, bodyW * 0.5); // ground shadow stays put, doesn't wobble
+  ellipse(0, -2, w * 0.4, w * 0.18); // ground shadow stays put, doesn't wobble
 
   rotate(radians(3.5) * wobbleAmp * actorStepParity * wob);
-  scale(1 + wob * 0.05 * wobbleAmp, 1 - wob * 0.05 * wobbleAmp); // slight x/y stretch-press
+  const stretchX = 1 + wob * 0.05 * wobbleAmp;
+  const stretchY = 1 - wob * 0.05 * wobbleAmp;
+  scale((mirror ? -1 : 1) * stretchX, stretchY); // mirror + walk stretch combined
 
-  fill(20, 18, 26);
-  rectMode(CENTER);
-  rect(0, -bodyH * 0.55, bodyW, bodyH, bodyW * 0.4);
-  circle(0, -bodyH - 4, bodyW * 0.7);
-  fill(255, 220, 150);
-  const fx = actor.facing.x, fy = actor.facing.y;
-  const rel = iso(fx * 0.35, fy * 0.35); // relative offset only
-  circle(rel.x - ORIGIN.x, rel.y - ORIGIN.y - bodyH - 4, 5);
+  imageMode(CORNER);
+  image(img, -w * meta.anchor.x, -h * meta.anchor.y, w, h);
   pop();
 }
 
@@ -638,8 +666,10 @@ function tryStep(dir, pulling) {
     startMoveAnim(blocker, fromX, fromY, dir); // it slides, so no separate bonk-in-place
     actor.x = tx; actor.y = ty;
     triggerWalk();
+    triggerTouch();
   } else {
     triggerBump(blocker, dir); // didn't move: a stationary "bonk" reaction instead
+    triggerTouch();
   }
 }
 
@@ -671,6 +701,7 @@ function tryPull(dir) {
   startMoveAnim(e, fromX, fromY, { x: back.x - actor.x, y: back.y - actor.y });
   actor.x = back.x; actor.y = back.y;
   triggerWalk();
+  triggerTouch();
 }
 
 function doInteract() {
@@ -678,6 +709,7 @@ function doInteract() {
   const e = entityAt(fx, fy, actor.z, () => true) ||
     activeEntities().find(ent => ent.cells.some(c => ent.x + c.dx === fx && ent.y + c.dy === fy));
   if (!e) return;
+  triggerTouch();
 
   if (e.id === 'crib' && era === 'present') {
     showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
@@ -709,6 +741,7 @@ function onNightstandBump() {
 }
 
 function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
+  triggerTouch();
   // The watch rolls along its path (up to 2 cells) and stops at the FIRST
   // of: the goal cell (vanishes under the wardrobe, even one cell early
   // and even if the full 2-cell distance would've overshot the wall), or

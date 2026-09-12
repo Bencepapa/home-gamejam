@@ -65,5 +65,13 @@
       "y": 0.95
     },
     "scale": 1
-  }
+  },
+  "man30_ne_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "man30_ne_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "man30_se_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "man30_se_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "kid2_ne_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "kid2_ne_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "kid2_se_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
+  "kid2_se_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 }
 }
