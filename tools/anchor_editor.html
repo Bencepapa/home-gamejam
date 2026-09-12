@@ -99,7 +99,7 @@ const ROOM_FILES = { room: '../assets/room/halo.png' };
 
 let data = { _comment: 'edited with tools/anchor_editor.html' };
 for (const k of SPRITES) data[k] = { anchor: {x:0.5, y:0.9}, scale: 1 };
-data._room = { originPx: { x: 0, y: 0 } };
+data._room = { originPx: { x: 0, y: 0 }, gridN: 6, tileW: 200.83, tileH: 100.83 };
 
 let current = null; // {key, isRoom, path}
 let naturalW = 0, naturalH = 0;
@@ -153,6 +153,8 @@ function select(key, isRoom, path) {
 
 function refreshFields() {
   if (!current) return;
+  el('gridN').value = data._room.gridN || 6;
+  el('gridTW').value = data._room.tileW || 200.83;
   if (current.isRoom) {
     const r = data._room.originPx;
     el('status').textContent = `origó px: (${r.x.toFixed(1)}, ${r.y.toFixed(1)})`;
@@ -189,20 +191,47 @@ function drawGridOverlay() {
   c.style.width = naturalW + 'px'; c.style.height = naturalH + 'px';
   const ctx = c.getContext('2d');
   ctx.clearRect(0,0,c.width,c.height);
-  if (!current || !current.isRoom || !el('showGrid').checked) return;
-  const N = parseInt(el('gridN').value) || 6;
-  const origin = data._room.originPx;
+  if (!current || !el('showGrid').checked) return;
+
   const TW = parseFloat(el('gridTW').value) || (naturalW * 0.24);
   const TH = TW / 2;
-  ctx.strokeStyle = 'rgba(0,255,255,0.8)';
-  ctx.lineWidth = 1;
-  function iso(x,y){ return [origin.x + (x-y)*TW/2, origin.y + (x+y)*TH/2]; }
-  ctx.beginPath();
-  for (let gx=0; gx<=N; gx++){ const a=iso(gx,0), b=iso(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
-  for (let gy=0; gy<=N; gy++){ const a=iso(0,gy), b=iso(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
-  ctx.stroke();
-  ctx.fillStyle = '#6bd1ff';
-  ctx.beginPath(); ctx.arc(origin.x, origin.y, 4, 0, 7); ctx.fill();
+
+  if (current.isRoom) {
+    const N = parseInt(el('gridN').value) || 6;
+    const origin = data._room.originPx;
+    ctx.strokeStyle = 'rgba(0,255,255,0.8)';
+    ctx.lineWidth = 1;
+    function iso(x,y){ return [origin.x + (x-y)*TW/2, origin.y + (x+y)*TH/2]; }
+    ctx.beginPath();
+    for (let gx=0; gx<=N; gx++){ const a=iso(gx,0), b=iso(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for (let gy=0; gy<=N; gy++){ const a=iso(0,gy), b=iso(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    ctx.stroke();
+    ctx.fillStyle = '#6bd1ff';
+    ctx.beginPath(); ctx.arc(origin.x, origin.y, 4, 0, 7); ctx.fill();
+  } else {
+    // sprite mode: draw ONE reference floor tile (diamond) whose near/bottom
+    // point sits exactly on the anchor marker, so you can see whether the
+    // anchor matches where the object's footprint should touch the ground.
+    const s = data[current.key];
+    const ax = s.anchor.x * naturalW, ay = s.anchor.y * naturalH;
+    const pts = [
+      [ax, ay],                 // near/bottom corner == anchor
+      [ax - TW/2, ay - TH/2],   // left corner
+      [ax, ay - TH],            // far corner
+      [ax + TW/2, ay - TH/2]    // right corner
+    ];
+    ctx.strokeStyle = 'rgba(0,255,255,0.85)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,255,255,0.15)';
+    ctx.fill();
+    ctx.fillStyle = '#ffcf6b';
+    ctx.beginPath(); ctx.arc(ax, ay, 4, 0, 7); ctx.fill();
+  }
 }
 
 // dragging
@@ -247,8 +276,8 @@ el('ay').addEventListener('input', () => { if(current && !current.isRoom){ data[
 el('ascale').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].scale = parseFloat(el('ascale').value)||1; updateJsonPreview(); }});
 el('zoom').addEventListener('input', () => { layoutMarker(); });
 el('showGrid').addEventListener('change', drawGridOverlay);
-el('gridN').addEventListener('input', drawGridOverlay);
-el('gridTW').addEventListener('input', drawGridOverlay);
+el('gridN').addEventListener('input', () => { data._room.gridN = parseInt(el('gridN').value)||6; drawGridOverlay(); updateJsonPreview(); });
+el('gridTW').addEventListener('input', () => { data._room.tileW = parseFloat(el('gridTW').value)||0; data._room.tileH = data._room.tileW/2; drawGridOverlay(); updateJsonPreview(); });
 
 function updateJsonPreview() {
   el('jsonOut').value = JSON.stringify(data, null, 2);
@@ -258,9 +287,11 @@ async function loadExisting() {
   try {
     const res = await fetch('../assets/sprites.json?_=' + Date.now());
     const j = await res.json();
-    data = Object.assign({ _room: { originPx: {x:0,y:0} } }, j);
+    data = Object.assign({ _room: { originPx: {x:0,y:0}, gridN:6, tileW:200.83, tileH:100.83 } }, j);
     for (const k of SPRITES) if (!data[k]) data[k] = { anchor:{x:0.5,y:0.9}, scale:1 };
-    if (!data._room) data._room = { originPx: {x:0,y:0} };
+    if (!data._room) data._room = { originPx: {x:0,y:0}, gridN:6, tileW:200.83, tileH:100.83 };
+    if (!data._room.gridN) data._room.gridN = 6;
+    if (!data._room.tileW) data._room.tileW = 200.83;
     el('jsonStatus').textContent = 'betöltve.';
     if (current) refreshFields();
     layoutMarker();

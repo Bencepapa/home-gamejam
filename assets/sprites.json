@@ -1,11 +1,18 @@
 {
-  "_comment": "Per-sprite render metadata, keyed by the same id used in game.js's images{} map. anchor.x/anchor.y are fractions (0-1) of the RAW image's own width/height, marking which point of the image should sit on the floor tile's target grid corner (usually the diamond's near/bottom point, sometimes its left point when the art's footprint is offset). scale corrects for sprites whose cutout has extra transparent padding around the drawn object, or that were sized against a different reference than the plate's TW/TH. Edit freely and reload -- no rebuild needed.",
+  "_comment": "Per-sprite render metadata, keyed by the same id used in game.js's images{} map. anchor.x/anchor.y are fractions (0-1) of the RAW image's own width/height, marking which point of the image should sit on the floor tile's target grid corner. scale corrects for sprites whose cutout has extra transparent padding. _room holds the plate's grid origin (originPx, the pixel location of grid (0,0)) plus gridN/tileW/tileH so the whole projection can be tuned from tools/anchor_editor.html without touching game.js.",
 
-  "crib":       { "anchor": { "x": 0.5, "y": 0.86 }, "scale": 1.05 },
-  "bed":        { "anchor": { "x": 0.5, "y": 0.90 }, "scale": 1.25 },
-  "nightstand": { "anchor": { "x": 0.5, "y": 0.90 }, "scale": 1.10 },
-  "wardrobe":   { "anchor": { "x": 0.5, "y": 0.92 }, "scale": 1.20 },
-  "watch":      { "anchor": { "x": 0.5, "y": 0.70 }, "scale": 0.90 },
-  "box1x1":     { "anchor": { "x": 0.5, "y": 0.88 }, "scale": 1.00 },
-  "box1x2":     { "anchor": { "x": 0.5, "y": 0.88 }, "scale": 1.00 }
+  "crib":       { "anchor": { "x": 0.637, "y": 0.903 }, "scale": 1 },
+  "bed":        { "anchor": { "x": 0.538, "y": 0.953 }, "scale": 1 },
+  "nightstand": { "anchor": { "x": 0.575, "y": 0.95 },  "scale": 1 },
+  "wardrobe":   { "anchor": { "x": 0.697, "y": 0.948 }, "scale": 1 },
+  "watch":      { "anchor": { "x": 0.5,   "y": 0.985 }, "scale": 1 },
+  "box1x1":     { "anchor": { "x": 0.472, "y": 0.967 }, "scale": 1 },
+  "box1x2":     { "anchor": { "x": 0.369, "y": 0.916 }, "scale": 1 },
+
+  "_room": {
+    "originPx": { "x": 720, "y": 395 },
+    "gridN": 6,
+    "tileW": 200.83,
+    "tileH": 100.83
+  }
 }

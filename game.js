@@ -6,13 +6,14 @@
    projection measured directly off assets/room/halo.png.
    ============================================================ */
 
-// ---- measured off the plate (tools/measure_plate.py) ----
-const DIAMOND_W = 1205, DIAMOND_H = 605, GRID_N = 6;
-const TW = DIAMOND_W / GRID_N;   // 200.83
-const TH = DIAMOND_H / GRID_N;   // 100.83
+// ---- measured off the plate (tools/measure_plate.py); all overridden in
+// setup() by assets/sprites.json's "_room" block if present, so the whole
+// projection can be tuned from tools/anchor_editor.html without code edits ----
+let GRID_N = 6;
+let TW = 200.83;
+let TH = 100.83;
 const ZH = 64;                   // one z-level; deliberately not TH or TH/2
-let ORIGIN = { x: 720, y: 395 }; // plate's back apex == grid (0,0); overridden by
-                                  // assets/sprites.json's "_room.originPx" if present
+let ORIGIN = { x: 720, y: 395 }; // plate's back apex == grid (0,0)
 
 const DESIGN_W = 1448, DESIGN_H = 1086; // native plate resolution
 let scaleF = 1, offX = 0, offY = 0;
@@ -205,8 +206,13 @@ function setup() {
   textFont('Georgia, serif');
   imageMode(CENTER);
   rectMode(CORNER);
-  if (spriteMeta._room && spriteMeta._room.originPx) {
-    ORIGIN = spriteMeta._room.originPx;
+  const room = spriteMeta._room;
+  if (room) {
+    if (room.originPx) ORIGIN = room.originPx;
+    if (room.gridN) GRID_N = room.gridN;
+    if (room.tileW) TW = room.tileW;
+    if (room.tileH) TH = room.tileH;
+    else if (room.tileW) TH = room.tileW / 2;
   }
   resetGame();
   buildDesaturatedPlate();
