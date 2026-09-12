@@ -156,8 +156,12 @@ function makeEntities() {
 
     // --- present-only: boxes filling the same footprint area ---
     {
+      // x:3 (not 4) so there's a clear cell on BOTH sides along its push
+      // axis -- at x:4 its right edge sat flush against the grid boundary
+      // (x:5 is the last column), so it could never be pushed: +x push hit
+      // the wall, and -x push needed the actor standing at x:6, off-grid.
       id: 'box_bed_1', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
-      x: 4, y: 1, z: 0, height: 1,
+      x: 3, y: 1, z: 0, height: 1,
       push: 'axis', axis: 'x', blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x2',
@@ -172,20 +176,16 @@ function makeEntities() {
       lookText: 'Apa fiókjának tartalma. Az órája nincs itt. Sosem került elő.'
     },
     {
-      id: 'box_wardrobe_1', cells: [{ dx: 0, dy: 0 }],
+      // the actual wardrobe, not boxes -- it stayed exactly where it stood
+      // in the past, just desaturated like the rest of the present (no
+      // anchor:true, so it DOES get the gray treatment). This is where the
+      // watch turns up, but only once the past puzzle has pushed it under
+      // there -- see watchFound and the 'wardrobe_present' interact below.
+      id: 'wardrobe_present', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 0, y: 0, z: 0, height: 1,
-      push: 'any', pull: true, blocking: true, stackable: true,
+      push: false, blocking: true, stackable: false,
       interact: 'look', era: 'present',
-      img: 'box1x1',
-      lookText: 'Régi könyvek a szekrényből.'
-    },
-    {
-      id: 'box_wardrobe_2', cells: [{ dx: 0, dy: 0 }],
-      x: 0, y: 1, z: 0, height: 1,
-      push: 'any', pull: true, blocking: true, stackable: true,
-      interact: 'look', era: 'present',
-      img: 'box1x1',
-      lookText: 'Kabátok, molyszagúan.'
+      img: 'wardrobe'
     }
   ];
 }
@@ -378,7 +378,8 @@ function drawScene() {
 }
 
 const BUMP_MS = 130; // decay time for the walk-into-it (stationary) wobble
-const DROP_MS = 200; // time spent visually falling before it starts rolling
+const DROP_MS = 380; // time spent visually falling before it starts rolling
+const ROLL_MS = 650; // time spent rolling to where it comes to rest
 
 function triggerBump(e, dir) {
   e.bumpT = 1;
@@ -391,12 +392,12 @@ function triggerBump(e, dir) {
 // ease the render position toward it over a short, distance-scaled time.
 // A watch rolling 2 cells in one push still gets ONE tween end to end,
 // not two chained ones, since fromX/fromY is always its pre-push cell.
-function startMoveAnim(e, fromX, fromY, dir) {
+function startMoveAnim(e, fromX, fromY, dir, durMsOverride) {
   e.animFromX = fromX;
   e.animFromY = fromY;
   e.animT = 0;
   const dist = Math.hypot(e.x - fromX, e.y - fromY) || 1;
-  e.animDurMs = 120 + dist * 40; // fast, a little longer for a 2-cell roll
+  e.animDurMs = durMsOverride || (120 + dist * 40); // fast, a little longer for a 2-cell roll
   e.animDir = (dir && dir.x !== 0) ? Math.sign(dir.x) : 1;
 }
 
@@ -780,6 +781,15 @@ function doInteract() {
     showToast('A saját bölcsőm. Furcsa innen nézni.');
     return;
   }
+  if (e.id === 'wardrobe_present') {
+    if (watchFound) {
+      showToast('Az óra. Ott van, ahová a baba begörgette.');
+      state = STATE.WIN;
+    } else {
+      showToast('A régi szekrény. Valamit keresek benne, de nem tudom, mit.');
+    }
+    return;
+  }
   if (e.interact === 'look' && e.lookText) {
     showToast(e.lookText);
     return;
@@ -803,16 +813,16 @@ function onNightstandBump() {
   showToast('Az óra lepottyan az éjjeliszekrényről...');
 
   setTimeout(() => {
-    // phase 2: it rolls toward (3,3), next to the bed -- but that's also
-    // crib_past's default cell. If the player hasn't pushed the crib out
-    // of the way first, the watch rolls straight into it and breaks.
+    // phase 2: it rolls toward (3,2) -- but that's also crib_past's own
+    // default cell. If the player hasn't pushed the crib out of the way
+    // first, the watch rolls straight into it and breaks.
     const fromX = watch.x, fromY = watch.y;
-    const blocked = !!entityAt(3, 3, watch.z, o => o.blocking && o !== watch);
-    watch.x = 3; watch.y = 3;
-    startMoveAnim(watch, fromX, fromY);
+    const blocked = !!entityAt(3, 2, watch.z, o => o.blocking && o !== watch);
+    watch.x = 3; watch.y = 2;
+    startMoveAnim(watch, fromX, fromY, null, ROLL_MS);
     if (blocked) {
       showToast('...és nekigurul a bölcsőnek.');
-      setTimeout(() => { triggerBump(watch, { x: 0, y: 0 }); breakWatch(); }, 160);
+      setTimeout(() => { triggerBump(watch, { x: 0, y: 0 }); breakWatch(); }, ROLL_MS - 100);
     } else {
       showToast('...és odagurul az ágy mellé.');
     }
@@ -862,6 +872,7 @@ function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
 }
 
 function onWatchReachedGoal() {
+  watchFound = true; // the wardrobe_present interaction checks this
   showToast('Az óra begördül a szekrény alá.');
   setTimeout(() => {
     showToast('A baba felsír.');
