@@ -308,6 +308,18 @@ function drawIntro() {
 
 /* ---------------- SCENE ---------------- */
 
+const LIGHTMAP_BASE = 0.12;   // alpha at t=0 (within the requested 0.10-0.15)
+const LIGHTMAP_MIN = 0.05;
+const LIGHTMAP_MAX = 0.50;
+
+function lightmapAlpha() {
+  const t = millis() * 0.001;
+  const slowBreath = 0.10 * sin(t * 0.05);  // big amplitude, very slow -- the "breathing"
+  const medWave = 0.06 * sin(t * 0.3);      // slower flicker
+  const fastWave = 0.03 * sin(t * 1.1);     // faster flicker
+  return constrain(LIGHTMAP_BASE + slowBreath + medWave + fastWave, LIGHTMAP_MIN, LIGHTMAP_MAX);
+}
+
 function drawScene() {
   const plateImg = (era === 'present') ? plateDesat : images.plate;
   imageMode(CENTER);
@@ -329,9 +341,11 @@ function drawScene() {
   drawables.sort((a, b) => a.depth - b.depth);
   for (const d of drawables) d.draw();
 
-  // lightmap glow, low opacity per art direction
+  // lightmap glow -- flickers gently: two faster sines dither the opacity,
+  // a third, slow, big-amplitude sine drifts it up and down like a breath.
+  // All phases start at 0, so alpha(0) == LIGHTMAP_BASE exactly.
   push();
-  tint(255, 255, 255, 38); // ~15%
+  tint(255, 255, 255, lightmapAlpha() * 255);
   imageMode(CENTER);
   image(images.lightmap, DESIGN_W / 2, DESIGN_H / 2);
   noTint();
