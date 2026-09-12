@@ -514,6 +514,7 @@ function drawScene() {
 const BUMP_MS = 130; // decay time for the walk-into-it (stationary) wobble
 const DROP_MS = 380; // time spent visually falling before it starts rolling
 const ROLL_MS = 650; // time spent rolling to where it comes to rest
+const FADE_MS = 550; // time spent dissolving away after breaking
 
 function triggerBump(e, dir) {
   e.bumpT = 1;
@@ -588,6 +589,17 @@ function drawEntity(e) {
   const ax = meta.anchor.x;
   const ay = meta.anchor.y;
 
+  // fadeT ramps 0->1 to visually dissolve an entity in place (e.g. the
+  // watch breaking) -- a placeholder for swapping in a broken-watch sprite
+  // later; for now it just fades away to show something went wrong.
+  let fadeAlpha = 255;
+  if (e.fadeT !== undefined && e.fadeT < 1) {
+    e.fadeT = min(1, e.fadeT + deltaTime / FADE_MS);
+    fadeAlpha = (1 - e.fadeT) * 255;
+  } else if (e.fadeT >= 1) {
+    return; // fully dissolved -- nothing left to draw
+  }
+
   push();
   translate(p.x, p.y);
   if (e.mirror) scale(-1, 1);
@@ -598,12 +610,13 @@ function drawEntity(e) {
     drawingContext.shadowColor = 'rgba(255,220,140,0.9)';
     drawingContext.shadowBlur = 20;
   }
+  tint(255, 255, 255, fadeAlpha);
   image(img, -w * ax, -h * ay, w, h); // color base, always
   if (desatAmt > 0 && desatImg) {
-    tint(255, 255, 255, desatAmt * 255); // gray overlay blended on top (0.5 = "still newish")
+    tint(255, 255, 255, desatAmt * fadeAlpha); // gray overlay blended on top (0.5 = "still newish")
     image(desatImg, -w * ax, -h * ay, w, h);
-    noTint();
   }
+  noTint();
   if (highlight) drawingContext.shadowBlur = 0;
   pop();
 }
@@ -992,7 +1005,9 @@ function onNightstandBump() {
     // first, the watch rolls straight into it and breaks.
     const fromX = watch.x, fromY = watch.y;
     const blocked = !!entityAt(3, 2, watch.z, o => o.blocking && o !== watch);
-    watch.x = 3; watch.y = 2;
+    // stop one cell short (right up against the crib) instead of rolling
+    // on top of it when it's in the way
+    watch.x = 3; watch.y = blocked ? 1 : 2;
     startMoveAnim(watch, fromX, fromY, null, ROLL_MS);
     if (blocked) {
       showToast(t('watchHitsCribToast'));
@@ -1025,7 +1040,13 @@ function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
   }
 
   const midBlocked = !inBounds(midX, midY) || !!entityAt(midX, midY, watch.z, o => o.blocking && o !== watch);
-  if (midBlocked) { triggerBump(watch, dir); breakWatch(); return; }
+  if (midBlocked) {
+    // no room to even take the first step -- it's already touching the
+    // obstacle from here, so just react in place before breaking
+    triggerBump(watch, dir);
+    breakWatch();
+    return;
+  }
 
   if (finalX === WATCH_GOAL.x && finalY === WATCH_GOAL.y) {
     watch.x = finalX; watch.y = finalY;
@@ -1037,7 +1058,16 @@ function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
   }
 
   const finalBlocked = !inBounds(finalX, finalY) || !!entityAt(finalX, finalY, watch.z, o => o.blocking && o !== watch);
-  if (finalBlocked) { triggerBump(watch, dir); breakWatch(); return; }
+  if (finalBlocked) {
+    // the second cell is blocked, but the first is clear -- slide up to
+    // the obstacle before reacting, instead of breaking on the spot
+    watch.x = midX; watch.y = midY;
+    startMoveAnim(watch, fromX, fromY, dir);
+    actor.x = actorTargetX; actor.y = actorTargetY;
+    triggerWalk();
+    setTimeout(() => { triggerBump(watch, dir); breakWatch(); }, watch.animDurMs);
+    return;
+  }
 
   watch.x = finalX; watch.y = finalY;
   startMoveAnim(watch, fromX, fromY, dir);
@@ -1061,6 +1091,8 @@ function onWatchReachedGoal() {
 
 function breakWatch() {
   showToast(t('watchBreakToast'), 5); // held longer -- give it time to read
+  const watch = entities.find(e => e.id === 'watch');
+  if (watch) watch.fadeT = 0; // dissolve it in place -- stands in for a broken-watch sprite later
   setTimeout(() => {
     startEraTransition(null, resetPastPuzzle); // fade out, reset while hidden, fade back in
   }, 1100);
@@ -1077,6 +1109,7 @@ function resetPastPuzzle() {
   watch.pushDistance = 1;
   watch.bumpT = 0;
   watch.dropT = 0;
+  watch.fadeT = undefined; // undo the dissolve from a break
   watch.animT = undefined; // cancel any slide it was mid-way through
   showToast(t('watchResetToast'));
 }
