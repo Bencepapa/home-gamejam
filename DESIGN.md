@@ -220,13 +220,38 @@ A tárgy végül begurul egy bútor alá és elveszik → **gyereksírás** → 
 
 **A szál:** ugyanaz a három rendszer (dobozvizsgálat, kergetés, tolás) egyetlen tengelyre fűzve — a végén azért tolod el apa dobozait, hogy megtaláld, amit tőle vettél el, és sosem adtál vissza.
 
-### 9.2 Nappali (óvodás) · **információ**
+### 9.2 Nappali (óvodás) · **információ + doboz-sokoban**
 
-Ovisként nem éred el a polcot → tornyot építesz fakockákból és könyvekből. Közben elrejtesz egy rajzot **abba a könyvbe, amiből apa mindig olvasott.**
+**Horgonyszín.** A könyvespolc — mindkét idősíkban megvan, megérintve vált a jelen és a múlt között, ahogy a bölcső a hálószobában.
 
-Felnőttként a könyvek dobozban vannak, eladásra. Meg kell találni, **melyik** könyv volt az — és a nyom a gyerekjelenetben van elrejtve, nem a jelenben (melyik könyvből olvasott, milyen színű, hol állt a polcon).
+**Jelen.** A könyvespolc félig kiürült, a könyvek fele már bedobozolva — **ugyanazok a doboz-entitások/sprite-ok**, mint a hálószobában (1×1 és 2×1, `Nézd` mindegyiken egy-egy könyv leírását adja: szín, cím-töredék, állapot). Új szabály csak ebben a szobában: **doboz dobozra tolható** — ha a tolás célcellája már foglalt egy másik tolható dobozzal, a doboz arra csúszik (z+1), nem blokkol. Ez az egyszerűbb megoldás a kettő közül, amit felvetettél (dobozok egymásra tolása vs. egymáson áttolás) — a meglévő "két egymásra pakolt doboz nem tolható tovább, de rá lehet állni" szabály változatlan marad, csak a *létrehozás* módja új: eddig a stack eleve úgy állt ott, most a játékos maga rakja egymásra őket, hogy helyet csináljon.
 
-Mechanika: sok **Nézd**, egy **Használd** a végén. Rossz tipp nem büntet, csak nem old meg semmit.
+**Átváltás.** A könyvespolcot megérintve visszahúz az emlék.
+
+**Múlt.** Az óvodás a kis dohányzóasztalnál ül, épp befejezte a rajzot (**induló póz: ülő**, nem álló — az első mozgás vagy interakció állítja fel). Interaktálható tárgyak:
+
+- **Nézd** a kanapén, a virágokon — hangulati szövegek.
+- **Nézd** a TV+NES egységen: *"A kedvenc játékom az Ice Climber."*
+- **Használd** a dohányzóasztalon heverő rajzon → felveszed (`hasDrawing = true`, a rajz-entitás eltűnik az asztalról; nincs általános inventory, csak ez az egy flag).
+- A **puff** (kis ülőbútor) egy önálló, tolható 1×1 entitás — ugyanaz a told-mechanika, mint a dobozoké. A könyvespolchoz kell tolni.
+- Rááll/felmászik a puffra (a doboz-rááll logika, z+1), és **Használd** a polcon → elrejti a rajzot a könyvek között (`drawingHidden = true`), majd rövid toast-lánc után automatikusan vissza a jelenbe (mint az óránál).
+
+**Kanapé/puff — ülés.** Interakció a kanapén vagy a puffon (ha a szereplő azok mellett áll és feléjük néz) leülteti a szereplőt (ülő póz, a te új sprite-od); bármelyik következő mozgás- vagy interakció-input feláll.
+
+**Háttérveszekedés.** Amíg a múlt-jelenetben vagyunk, az ajtó felől kis betűméretű, ismétlődő szövegcsík fut be időzítve (nem a fő toast-rendszer — külön, halkabb UI elem), 6–8 sorból ciklikusan: anya veszekszik, kifakad, megfenyegeti a gyereket ("ha összefirkálod a bútort, elverlek"), apa próbál csendesíteni. Sose old meg semmit, csak hangulat és nyomás — a gyerek eközben csinálja a magáét.
+
+**Megoldás.** A jelenben a rajz előkerül (a polcnál vagy a dobozok között): a felnőtt elmeséli, hogy a saját családját rajzolta le — ő, apa és a kutyus az egyik oldalon, anya a lap másik oldalán, mindenki mosolyog. A kontraszt a múltban hallott veszekedéssel csinálja a hatást.
+
+**Fejtörő mérete:** a dobozrész hasonló léptékű, mint a hálószobai (pár doboz, néhány lépés); a múltbeli rész egy rövid script-lánc (rajz felvétele → puff a polchoz → felmászás → elrejtés), nem külön térbeli fejtörő.
+
+**A szál:** a gyerek, miközben a szülei az ajtón túl veszekednek, egy boldog családi rajzot rejt el a könyvek közé — a felnőtt ezt találja meg a kiürülő házban, évekkel később.
+
+**Motor-kiegészítések ehhez a szobához** (újak a hálószobához képest):
+1. Doboz-egymásra-tolás (fent).
+2. Felvehető tárgy: egyetlen boolean flag + entitás eltüntetése, nincs általános inventory.
+3. Másztálható bútor (puff): a doboz z+1-es rááll-logika, külön push+climb entitásként.
+4. Ülő póz + automatikus felállás: a szereplőn egy `sitting` state, bútor-interakcióval be, bármilyen input ki.
+5. Háttér-dialógus csík: ismétlődő/ciklikus rövid szövegek az ajtó felől, a fő toast-rendszertől függetlenül, csak amíg `era === 'past'` ebben a szobában.
 
 ### 9.3 Gyerekszoba (iskolás) · **sorrend**
 
