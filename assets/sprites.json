@@ -1,17 +1,19 @@
 {
-  "_comment": "Per-sprite render metadata, keyed by the same id used in game.js's images{} map. anchor.x/anchor.y are fractions (0-1) of the RAW image's own width/height, marking which point of the image should sit on the floor tile's target grid corner. scale corrects for sprites whose cutout has extra transparent padding. _room holds the plate's grid origin (originPx, the pixel location of grid (0,0)) plus gridN/tileW/tileH so the whole projection can be tuned from tools/anchor_editor.html without touching game.js.",
+  "_comment": "Per-sprite render metadata for game.js's images{} map. anchor.x/anchor.y are fractions of the RAW image's own width/height (can go below 0 or above 1 -- the anchor editor no longer clamps this, since a tightly-cropped sprite's true ground-contact point can fall outside its own pixels). scale corrects sprites with baked-in padding. _room holds the plate's grid: originPx is grid (0,0)'s pixel location; axisX/axisY are the screen-space vector moved per +1 step along each grid axis, independently measured (not assumed symmetric) via tools/anchor_editor.html's 3-point calibration. tileW/tileH are kept only as a legacy fallback/reference.",
 
-  "crib":       { "anchor": { "x": 0.637, "y": 0.903 }, "scale": 1 },
-  "bed":        { "anchor": { "x": 0.538, "y": 0.953 }, "scale": 1 },
-  "nightstand": { "anchor": { "x": 0.575, "y": 0.95 },  "scale": 1 },
-  "wardrobe":   { "anchor": { "x": 0.697, "y": 0.948 }, "scale": 1 },
-  "watch":      { "anchor": { "x": 0.5,   "y": 0.985 }, "scale": 1 },
-  "box1x1":     { "anchor": { "x": 0.472, "y": 0.967 }, "scale": 1 },
-  "box1x2":     { "anchor": { "x": 0.369, "y": 0.916 }, "scale": 1 },
+  "crib":       { "anchor": { "x": 0.643, "y": 0.931 }, "scale": 1 },
+  "bed":        { "anchor": { "x": 0.578, "y": 1 },     "scale": 1 },
+  "nightstand": { "anchor": { "x": 0.596, "y": 1 },     "scale": 1 },
+  "wardrobe":   { "anchor": { "x": 0.653, "y": 1 },     "scale": 1 },
+  "watch":      { "anchor": { "x": 0.468, "y": 1 },     "scale": 1 },
+  "box1x1":     { "anchor": { "x": 0.494, "y": 0.995 }, "scale": 1 },
+  "box1x2":     { "anchor": { "x": 0.369, "y": 0.95 },  "scale": 1 },
 
   "_room": {
     "originPx": { "x": 720, "y": 395 },
     "gridN": 6,
+    "axisX": { "x": 96.667, "y": 43.333 },
+    "axisY": { "x": -104.167, "y": 42.5 },
     "tileW": 200.83,
     "tileH": 100.83
   }

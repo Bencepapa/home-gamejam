@@ -10,8 +10,11 @@
 // setup() by assets/sprites.json's "_room" block if present, so the whole
 // projection can be tuned from tools/anchor_editor.html without code edits ----
 let GRID_N = 6;
-let TW = 200.83;
-let TH = 100.83;
+// Per-axis screen vectors (px moved per +1 grid step). Kept independent
+// rather than a single symmetric TW/TH, because a real plate photo/render
+// can have two axes that aren't perfect mirror images of each other.
+let AXIS_X = { x: 100.4, y: 50.4 };
+let AXIS_Y = { x: -100.4, y: 50.4 };
 const ZH = 64;                   // one z-level; deliberately not TH or TH/2
 let ORIGIN = { x: 720, y: 395 }; // plate's back apex == grid (0,0)
 
@@ -59,8 +62,8 @@ function metaFor(imgKey) {
 
 function iso(x, y, z = 0) {
   return {
-    x: ORIGIN.x + (x - y) * TW / 2,
-    y: ORIGIN.y + (x + y) * TH / 2 - z * ZH
+    x: ORIGIN.x + x * AXIS_X.x + y * AXIS_Y.x,
+    y: ORIGIN.y + x * AXIS_X.y + y * AXIS_Y.y - z * ZH
   };
 }
 
@@ -210,9 +213,17 @@ function setup() {
   if (room) {
     if (room.originPx) ORIGIN = room.originPx;
     if (room.gridN) GRID_N = room.gridN;
-    if (room.tileW) TW = room.tileW;
-    if (room.tileH) TH = room.tileH;
-    else if (room.tileW) TH = room.tileW / 2;
+    if (room.axisX && room.axisY) {
+      // preferred: independently-measured per-axis vectors (see
+      // tools/anchor_editor.html's 3-point calibration)
+      AXIS_X = room.axisX;
+      AXIS_Y = room.axisY;
+    } else if (room.tileW) {
+      // legacy fallback: symmetric diamond derived from a single tile size
+      const tw = room.tileW, th = room.tileH || room.tileW / 2;
+      AXIS_X = { x: tw / 2, y: th / 2 };
+      AXIS_Y = { x: -tw / 2, y: th / 2 };
+    }
   }
   resetGame();
   buildDesaturatedPlate();

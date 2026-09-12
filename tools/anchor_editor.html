@@ -15,30 +15,33 @@
   .item img { width:28px; height:28px; object-fit:contain; background:#111; border-radius:3px; }
   .item span { font-size:13px; }
   #main { flex:1; display:flex; flex-direction:column; min-width:0; }
-  #toolbar { padding:10px 14px; background:#22242c; display:flex; gap:16px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #333; }
-  #toolbar label { font-size:12px; color:#aaa; display:flex; align-items:center; gap:6px; }
-  #toolbar input[type=number] { width:70px; background:#111; color:#eee; border:1px solid #444; border-radius:4px; padding:3px 6px; }
+  #toolbar { padding:8px 14px; background:#22242c; display:flex; gap:16px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #333; }
+  #calbar { padding:6px 14px; background:#1e2028; display:flex; gap:10px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #333; }
+  #toolbar label, #calbar label { font-size:12px; color:#aaa; display:flex; align-items:center; gap:6px; }
+  #toolbar input[type=number], #calbar input[type=number] { width:70px; background:#111; color:#eee; border:1px solid #444; border-radius:4px; padding:3px 6px; }
   #canvasWrap { flex:1; overflow:auto; position:relative; background:
     repeating-conic-gradient(#2a2c34 0% 25%, #24262e 0% 50%) 50% / 24px 24px; }
   #stage { position:relative; transform-origin: 0 0; }
   #stage img { display:block; pointer-events:none; }
   .marker { position:absolute; width:18px; height:18px; margin:-9px 0 0 -9px; border-radius:50%;
-    border:2px solid #ffcf6b; background:rgba(255,207,107,0.25); cursor:grab; box-shadow:0 0 0 2px rgba(0,0,0,0.6); }
+    border:2px solid #ffcf6b; background:rgba(255,207,107,0.25); cursor:grab; box-shadow:0 0 0 2px rgba(0,0,0,0.6); z-index:5; }
   .marker.origin { border-color:#6bd1ff; background:rgba(107,209,255,0.25); }
   .marker:active { cursor:grabbing; }
-  .crosshair { position:absolute; pointer-events:none; }
-  .crosshair::before, .crosshair::after { content:''; position:absolute; background:rgba(255,207,107,0.9); }
-  .crosshair::before { width:1px; height:4000px; left:0; top:-2000px; }
-  .crosshair::after { height:1px; width:4000px; top:0; left:-2000px; }
+  #calMarkers .calpt { position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%;
+    border:2px solid #7bff9e; background:rgba(123,255,158,0.3); pointer-events:none; z-index:4; }
   #gridOverlay { position:absolute; left:0; top:0; pointer-events:none; }
   #jsonPanel { height:220px; flex:none; background:#111; border-top:1px solid #333; display:flex; flex-direction:column; }
   #jsonPanel textarea { flex:1; background:#0c0c0f; color:#8fd18f; font:12px/1.4 monospace; border:none; padding:10px; resize:none; }
-  #jsonPanel .bar { padding:6px 10px; display:flex; gap:8px; background:#181a20; }
+  #jsonPanel .bar { padding:6px 10px; display:flex; gap:8px; align-items:center; background:#181a20; flex-wrap:wrap; }
   button { background:#3a5a8a; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; }
   button:hover { background:#4a6fae; }
   button.secondary { background:#3a3d47; }
   button.secondary:hover { background:#4a4d57; }
+  button.cal { background:#2f6b45; }
+  button.cal:hover { background:#3c8657; }
+  button.cal.active { background:#5cbf7f; color:#111; }
   #status { font-size:12px; color:#9a9; margin-left:auto; }
+  #calHint { font-size:12px; color:#7bff9e; }
 </style>
 </head>
 <body>
@@ -57,28 +60,38 @@
   <div id="main">
     <div id="toolbar">
       <strong id="currentName">—</strong>
-      <label>Zoom <input type="range" id="zoom" min="0.1" max="2" step="0.05" value="1"></label>
+      <label>Zoom <input type="range" id="zoom" min="0.1" max="3" step="0.05" value="1"></label>
       <label>anchor x <input type="number" id="ax" step="0.001"></label>
       <label>anchor y <input type="number" id="ay" step="0.001"></label>
       <label>scale <input type="number" id="ascale" step="0.01" value="1"></label>
+      <span id="status"></span>
+    </div>
+    <div id="calbar">
       <label><input type="checkbox" id="showGrid"> rács előnézet</label>
       <label>N <input type="number" id="gridN" value="6" step="1" style="width:40px;"></label>
-      <label>TW <input type="number" id="gridTW" value="200.8" step="0.1" style="width:70px;"></label>
-      <span id="status"></span>
+      <label>TW <input type="number" id="gridTW" step="0.1"></label>
+      <label>TH <input type="number" id="gridTH" step="0.1"></label>
+      <span style="width:1px; height:18px; background:#444;"></span>
+      <button class="cal" id="calBtn" onclick="toggleCalibration()">3-pontos kalibráció (csak szobánál)</button>
+      <span id="calHint"></span>
     </div>
     <div id="canvasWrap">
       <div id="stage">
         <img id="img" src="">
         <canvas id="gridOverlay"></canvas>
+        <div id="calMarkers"></div>
         <div class="marker" id="marker" hidden></div>
       </div>
     </div>
     <div id="jsonPanel">
       <div class="bar">
-        <button onclick="loadExisting()">sprites.json betöltése</button>
+        <button onclick="loadExisting()">sprites.json betöltése (szerver)</button>
+        <label class="secondary" style="background:#3a3d47; border-radius:6px; padding:6px 12px; cursor:pointer;">
+          megnyitás lemezről<input type="file" id="fileOpen" accept=".json" style="display:none;">
+        </label>
         <button onclick="copyJson()">JSON másolása</button>
         <button onclick="downloadJson()">Letöltés (sprites.json)</button>
-        <span id="jsonStatus" style="align-self:center; color:#9a9; font-size:12px;"></span>
+        <span id="jsonStatus" style="color:#9a9; font-size:12px;"></span>
       </div>
       <textarea id="jsonOut" spellcheck="false"></textarea>
     </div>
@@ -97,12 +110,22 @@ const SPRITE_FILES = {
 };
 const ROOM_FILES = { room: '../assets/room/halo.png' };
 
+const DEFAULT_ROOM = {
+  originPx: { x: 0, y: 0 }, gridN: 6,
+  axisX: { x: 100, y: 50 }, axisY: { x: -100, y: 50 },
+  tileW: 200, tileH: 100
+};
+
 let data = { _comment: 'edited with tools/anchor_editor.html' };
 for (const k of SPRITES) data[k] = { anchor: {x:0.5, y:0.9}, scale: 1 };
-data._room = { originPx: { x: 0, y: 0 }, gridN: 6, tileW: 200.83, tileH: 100.83 };
+data._room = JSON.parse(JSON.stringify(DEFAULT_ROOM));
 
 let current = null; // {key, isRoom, path}
 let naturalW = 0, naturalH = 0;
+
+// 3-point calibration state: click order is origin -> +x end -> +y end
+let calibrating = false;
+let calPoints = []; // [{x,y}, ...] up to 3
 
 function el(id){ return document.getElementById(id); }
 
@@ -135,6 +158,7 @@ function loadCustom() {
 
 function select(key, isRoom, path) {
   current = { key, isRoom, path };
+  stopCalibration();
   document.querySelectorAll('.item').forEach(i => i.classList.toggle('active', i.dataset.key === key));
   el('currentName').textContent = key + (isRoom ? ' (szoba)' : '');
   const img = el('img');
@@ -148,13 +172,15 @@ function select(key, isRoom, path) {
   el('ax').closest('label').style.display = isRoom ? 'none' : '';
   el('ay').closest('label').style.display = isRoom ? 'none' : '';
   el('ascale').closest('label').style.display = isRoom ? 'none' : '';
+  el('calBtn').style.display = isRoom ? '' : 'none';
   el('marker').className = 'marker' + (isRoom ? ' origin' : '');
 }
 
 function refreshFields() {
   if (!current) return;
   el('gridN').value = data._room.gridN || 6;
-  el('gridTW').value = data._room.tileW || 200.83;
+  el('gridTW').value = (data._room.tileW || 200).toFixed ? data._room.tileW.toFixed(2) : data._room.tileW;
+  el('gridTH').value = (data._room.tileH || 100).toFixed ? data._room.tileH.toFixed(2) : data._room.tileH;
   if (current.isRoom) {
     const r = data._room.originPx;
     el('status').textContent = `origó px: (${r.x.toFixed(1)}, ${r.y.toFixed(1)})`;
@@ -185,6 +211,13 @@ function layoutMarker() {
   }
 }
 
+function currentAxes() {
+  const r = data._room;
+  if (r.axisX && r.axisY) return { axisX: r.axisX, axisY: r.axisY };
+  const tw = parseFloat(el('gridTW').value) || 200, th = parseFloat(el('gridTH').value) || tw/2;
+  return { axisX: { x: tw/2, y: th/2 }, axisY: { x: -tw/2, y: th/2 } };
+}
+
 function drawGridOverlay() {
   const c = el('gridOverlay');
   c.width = naturalW; c.height = naturalH;
@@ -193,77 +226,78 @@ function drawGridOverlay() {
   ctx.clearRect(0,0,c.width,c.height);
   if (!current || !el('showGrid').checked) return;
 
-  const TW = parseFloat(el('gridTW').value) || (naturalW * 0.24);
-  const TH = TW / 2;
+  const { axisX, axisY } = currentAxes();
 
   if (current.isRoom) {
     const N = parseInt(el('gridN').value) || 6;
     const origin = data._room.originPx;
+    function isoPt(x,y){ return [origin.x + x*axisX.x + y*axisY.x, origin.y + x*axisX.y + y*axisY.y]; }
     ctx.strokeStyle = 'rgba(0,255,255,0.8)';
     ctx.lineWidth = 1;
-    function iso(x,y){ return [origin.x + (x-y)*TW/2, origin.y + (x+y)*TH/2]; }
     ctx.beginPath();
-    for (let gx=0; gx<=N; gx++){ const a=iso(gx,0), b=iso(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
-    for (let gy=0; gy<=N; gy++){ const a=iso(0,gy), b=iso(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for (let gx=0; gx<=N; gx++){ const a=isoPt(gx,0), b=isoPt(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for (let gy=0; gy<=N; gy++){ const a=isoPt(0,gy), b=isoPt(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
     ctx.stroke();
     ctx.fillStyle = '#6bd1ff';
     ctx.beginPath(); ctx.arc(origin.x, origin.y, 4, 0, 7); ctx.fill();
   } else {
-    // sprite mode: draw ONE reference floor tile (diamond) whose near/bottom
-    // point sits exactly on the anchor marker, so you can see whether the
-    // anchor matches where the object's footprint should touch the ground.
+    // sprite mode: draw an NxN grid whose FRONT (near/bottom) corner sits
+    // exactly on the anchor marker, so multi-cell furniture can be checked
+    // against more than one tile. N comes from the shared "N" field.
     const s = data[current.key];
+    const N = parseInt(el('gridN').value) || 1;
     const ax = s.anchor.x * naturalW, ay = s.anchor.y * naturalH;
-    const pts = [
-      [ax, ay],                 // near/bottom corner == anchor
-      [ax - TW/2, ay - TH/2],   // left corner
-      [ax, ay - TH],            // far corner
-      [ax + TW/2, ay - TH/2]    // right corner
-    ];
+    // local grid coords: (N,N) must land exactly on (ax,ay)
+    const originX = ax - N*axisX.x - N*axisY.x;
+    const originY = ay - N*axisX.y - N*axisY.y;
+    function isoPt(x,y){ return [originX + x*axisX.x + y*axisY.x, originY + x*axisX.y + y*axisY.y]; }
     ctx.strokeStyle = 'rgba(0,255,255,0.85)';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(pts[0][0], pts[0][1]);
-    for (let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0], pts[i][1]);
-    ctx.closePath();
+    for (let gx=0; gx<=N; gx++){ const a=isoPt(gx,0), b=isoPt(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for (let gy=0; gy<=N; gy++){ const a=isoPt(0,gy), b=isoPt(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
     ctx.stroke();
-    ctx.fillStyle = 'rgba(0,255,255,0.15)';
+    ctx.fillStyle = 'rgba(0,255,255,0.12)';
+    ctx.beginPath();
+    const c1=isoPt(0,0), c2=isoPt(N,0), c3=isoPt(N,N), c4=isoPt(0,N);
+    ctx.moveTo(c1[0],c1[1]); ctx.lineTo(c2[0],c2[1]); ctx.lineTo(c3[0],c3[1]); ctx.lineTo(c4[0],c4[1]); ctx.closePath();
     ctx.fill();
     ctx.fillStyle = '#ffcf6b';
     ctx.beginPath(); ctx.arc(ax, ay, 4, 0, 7); ctx.fill();
   }
 }
 
-// dragging
+// ---- dragging / placing ----
 let dragging = false;
 el('marker').addEventListener('mousedown', e => { dragging = true; e.preventDefault(); });
 window.addEventListener('mouseup', () => dragging = false);
 window.addEventListener('mousemove', e => {
   if (!dragging || !current) return;
-  const stage = el('stage');
-  const zoom = parseFloat(el('zoom').value);
-  const rect = stage.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / zoom;
-  const y = (e.clientY - rect.top) / zoom;
-  setPoint(x, y);
+  const p = eventToImagePoint(e);
+  setPoint(p.x, p.y);
 });
-el('stage').addEventListener('click', e => {
+el('canvasWrap').addEventListener('click', e => {
   if (e.target.id === 'marker') return;
+  if (calibrating) { handleCalibrationClick(e); return; }
+  const p = eventToImagePoint(e);
+  setPoint(p.x, p.y);
+});
+
+function eventToImagePoint(e) {
   const stage = el('stage');
   const zoom = parseFloat(el('zoom').value);
   const rect = stage.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / zoom;
-  const y = (e.clientY - rect.top) / zoom;
-  setPoint(x, y);
-});
+  return { x: (e.clientX - rect.left) / zoom, y: (e.clientY - rect.top) / zoom };
+}
 
 function setPoint(x, y) {
   if (!current) return;
   if (current.isRoom) {
     data._room.originPx = { x: Math.round(x*10)/10, y: Math.round(y*10)/10 };
   } else {
-    const fx = Math.min(1, Math.max(0, x / naturalW));
-    const fy = Math.min(1, Math.max(0, y / naturalH));
+    // deliberately NOT clamped to [0,1]: a tightly-cropped sprite's true
+    // ground-contact point can fall outside its own pixel bounds.
+    const fx = x / naturalW, fy = y / naturalH;
     data[current.key].anchor = { x: Math.round(fx*1000)/1000, y: Math.round(fy*1000)/1000 };
   }
   layoutMarker();
@@ -271,35 +305,124 @@ function setPoint(x, y) {
   refreshFields();
 }
 
-el('ax').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].anchor.x = parseFloat(el('ax').value)||0; layoutMarker(); }});
-el('ay').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].anchor.y = parseFloat(el('ay').value)||0; layoutMarker(); }});
+el('ax').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].anchor.x = parseFloat(el('ax').value)||0; layoutMarker(); drawGridOverlay(); }});
+el('ay').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].anchor.y = parseFloat(el('ay').value)||0; layoutMarker(); drawGridOverlay(); }});
 el('ascale').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].scale = parseFloat(el('ascale').value)||1; updateJsonPreview(); }});
 el('zoom').addEventListener('input', () => { layoutMarker(); });
 el('showGrid').addEventListener('change', drawGridOverlay);
 el('gridN').addEventListener('input', () => { data._room.gridN = parseInt(el('gridN').value)||6; drawGridOverlay(); updateJsonPreview(); });
-el('gridTW').addEventListener('input', () => { data._room.tileW = parseFloat(el('gridTW').value)||0; data._room.tileH = data._room.tileW/2; drawGridOverlay(); updateJsonPreview(); });
+el('gridTW').addEventListener('input', () => {
+  const tw = parseFloat(el('gridTW').value)||0;
+  data._room.tileW = tw;
+  // manual TW/TH edits always produce a symmetric diamond, overwriting any
+  // previously-calibrated (possibly asymmetric) axisX/axisY
+  const th = parseFloat(el('gridTH').value) || tw/2;
+  data._room.axisX = { x: tw/2, y: th/2 };
+  data._room.axisY = { x: -tw/2, y: th/2 };
+  drawGridOverlay(); updateJsonPreview();
+});
+el('gridTH').addEventListener('input', () => {
+  const th = parseFloat(el('gridTH').value)||0;
+  data._room.tileH = th;
+  const tw = parseFloat(el('gridTW').value) || th*2;
+  data._room.axisX = { x: tw/2, y: th/2 };
+  data._room.axisY = { x: -tw/2, y: th/2 };
+  drawGridOverlay(); updateJsonPreview();
+});
+
+// ---- 3-point axis calibration (room only) ----
+// Click order: 1) origin (grid 0,0)  2) far end of +x axis (grid N,0)
+// 3) far end of +y axis (grid 0,N). This measures the two axes
+// independently, so they don't have to be mirror images of each other.
+function toggleCalibration() {
+  if (!current || !current.isRoom) return;
+  calibrating ? stopCalibration() : startCalibration();
+}
+function startCalibration() {
+  calibrating = true;
+  calPoints = [];
+  el('calBtn').classList.add('active');
+  el('calHint').textContent = '1/3: kattints az origóra (rács (0,0) sarka)';
+  el('calMarkers').innerHTML = '';
+}
+function stopCalibration() {
+  calibrating = false;
+  calPoints = [];
+  el('calBtn').classList.remove('active');
+  el('calHint').textContent = '';
+  el('calMarkers').innerHTML = '';
+}
+function handleCalibrationClick(e) {
+  const p = eventToImagePoint(e);
+  calPoints.push(p);
+  const dot = document.createElement('div');
+  dot.className = 'calpt';
+  dot.style.left = p.x + 'px';
+  dot.style.top = p.y + 'px';
+  el('calMarkers').appendChild(dot);
+  if (calPoints.length === 1) {
+    el('calHint').textContent = `2/3: kattints a +x tengely végére (rács (${el('gridN').value},0) sarka)`;
+  } else if (calPoints.length === 2) {
+    el('calHint').textContent = `3/3: kattints a +y tengely végére (rács (0,${el('gridN').value}) sarka)`;
+  } else if (calPoints.length === 3) {
+    const N = parseInt(el('gridN').value) || 6;
+    const [o, xEnd, yEnd] = calPoints;
+    data._room.originPx = { x: Math.round(o.x*10)/10, y: Math.round(o.y*10)/10 };
+    data._room.axisX = { x: Math.round((xEnd.x-o.x)/N*1000)/1000, y: Math.round((xEnd.y-o.y)/N*1000)/1000 };
+    data._room.axisY = { x: Math.round((yEnd.x-o.x)/N*1000)/1000, y: Math.round((yEnd.y-o.y)/N*1000)/1000 };
+    data._room.tileW = Math.round(Math.abs(data._room.axisX.x - data._room.axisY.x)*100)/100;
+    data._room.tileH = Math.round((data._room.axisX.y + data._room.axisY.y)*100)/100;
+    el('calHint').textContent = 'kész — axisX/axisY frissítve.';
+    stopCalibration();
+    layoutMarker();
+    refreshFields();
+    drawGridOverlay();
+  }
+}
 
 function updateJsonPreview() {
   el('jsonOut').value = JSON.stringify(data, null, 2);
 }
 
+function applyLoadedJson(j) {
+  data = Object.assign({ _room: JSON.parse(JSON.stringify(DEFAULT_ROOM)) }, j);
+  for (const k of SPRITES) if (!data[k]) data[k] = { anchor:{x:0.5,y:0.9}, scale:1 };
+  if (!data._room) data._room = JSON.parse(JSON.stringify(DEFAULT_ROOM));
+  if (!data._room.gridN) data._room.gridN = 6;
+  if (!data._room.tileW) data._room.tileW = 200;
+  if (!data._room.axisX || !data._room.axisY) {
+    const tw = data._room.tileW, th = data._room.tileH || tw/2;
+    data._room.axisX = { x: tw/2, y: th/2 };
+    data._room.axisY = { x: -tw/2, y: th/2 };
+  }
+  if (current) refreshFields();
+  layoutMarker();
+  drawGridOverlay();
+  updateJsonPreview();
+}
+
 async function loadExisting() {
   try {
     const res = await fetch('../assets/sprites.json?_=' + Date.now());
-    const j = await res.json();
-    data = Object.assign({ _room: { originPx: {x:0,y:0}, gridN:6, tileW:200.83, tileH:100.83 } }, j);
-    for (const k of SPRITES) if (!data[k]) data[k] = { anchor:{x:0.5,y:0.9}, scale:1 };
-    if (!data._room) data._room = { originPx: {x:0,y:0}, gridN:6, tileW:200.83, tileH:100.83 };
-    if (!data._room.gridN) data._room.gridN = 6;
-    if (!data._room.tileW) data._room.tileW = 200.83;
-    el('jsonStatus').textContent = 'betöltve.';
-    if (current) refreshFields();
-    layoutMarker();
-    updateJsonPreview();
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    applyLoadedJson(await res.json());
+    el('jsonStatus').textContent = 'betöltve a szerverről.';
   } catch (e) {
-    el('jsonStatus').textContent = 'nem sikerült betölteni: ' + e.message;
+    el('jsonStatus').textContent = 'nem sikerült a szerverről betölteni (' + e.message + ') — ha file:// -ből nyitottad meg, ez a böngésző CORS-szabálya miatt várható; használd a "megnyitás lemezről" gombot, vagy indítsd a tools/anchor_editor.html-t is a helyi szerveren keresztül.';
   }
 }
+
+el('fileOpen').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    applyLoadedJson(JSON.parse(text));
+    el('jsonStatus').textContent = `betöltve: ${file.name}`;
+  } catch (err) {
+    el('jsonStatus').textContent = 'hibás JSON fájl: ' + err.message;
+  }
+});
 
 function copyJson() {
   updateJsonPreview();
