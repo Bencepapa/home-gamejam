@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<title>Anchor editor — HOME</title>
+<style>
+  html, body { margin:0; padding:0; background:#1a1c22; color:#e8e6e0; font-family: system-ui, sans-serif; height:100%; }
+  #app { display:flex; height:100vh; }
+  #sidebar { width:260px; flex:none; background:#22242c; padding:12px; overflow-y:auto; box-sizing:border-box; }
+  #sidebar h2 { font-size:14px; text-transform:uppercase; letter-spacing:0.05em; color:#9a9a9a; margin:16px 0 6px; }
+  #sidebar h2:first-child { margin-top:0; }
+  .item { display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:6px; cursor:pointer; margin-bottom:2px; }
+  .item:hover { background:#2e3038; }
+  .item.active { background:#3a5a8a; }
+  .item img { width:28px; height:28px; object-fit:contain; background:#111; border-radius:3px; }
+  .item span { font-size:13px; }
+  #main { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #toolbar { padding:10px 14px; background:#22242c; display:flex; gap:16px; align-items:center; flex-wrap:wrap; border-bottom:1px solid #333; }
+  #toolbar label { font-size:12px; color:#aaa; display:flex; align-items:center; gap:6px; }
+  #toolbar input[type=number] { width:70px; background:#111; color:#eee; border:1px solid #444; border-radius:4px; padding:3px 6px; }
+  #canvasWrap { flex:1; overflow:auto; position:relative; background:
+    repeating-conic-gradient(#2a2c34 0% 25%, #24262e 0% 50%) 50% / 24px 24px; }
+  #stage { position:relative; transform-origin: 0 0; }
+  #stage img { display:block; pointer-events:none; }
+  .marker { position:absolute; width:18px; height:18px; margin:-9px 0 0 -9px; border-radius:50%;
+    border:2px solid #ffcf6b; background:rgba(255,207,107,0.25); cursor:grab; box-shadow:0 0 0 2px rgba(0,0,0,0.6); }
+  .marker.origin { border-color:#6bd1ff; background:rgba(107,209,255,0.25); }
+  .marker:active { cursor:grabbing; }
+  .crosshair { position:absolute; pointer-events:none; }
+  .crosshair::before, .crosshair::after { content:''; position:absolute; background:rgba(255,207,107,0.9); }
+  .crosshair::before { width:1px; height:4000px; left:0; top:-2000px; }
+  .crosshair::after { height:1px; width:4000px; top:0; left:-2000px; }
+  #gridOverlay { position:absolute; left:0; top:0; pointer-events:none; }
+  #jsonPanel { height:220px; flex:none; background:#111; border-top:1px solid #333; display:flex; flex-direction:column; }
+  #jsonPanel textarea { flex:1; background:#0c0c0f; color:#8fd18f; font:12px/1.4 monospace; border:none; padding:10px; resize:none; }
+  #jsonPanel .bar { padding:6px 10px; display:flex; gap:8px; background:#181a20; }
+  button { background:#3a5a8a; color:#fff; border:none; border-radius:6px; padding:6px 12px; font-size:13px; cursor:pointer; }
+  button:hover { background:#4a6fae; }
+  button.secondary { background:#3a3d47; }
+  button.secondary:hover { background:#4a4d57; }
+  #status { font-size:12px; color:#9a9; margin-left:auto; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="sidebar">
+    <h2>Bútor sprite-ok</h2>
+    <div id="spriteList"></div>
+    <h2>Szoba plate</h2>
+    <div id="roomList"></div>
+    <h2>Egyéni fájl</h2>
+    <div style="display:flex; gap:4px;">
+      <input id="customPath" placeholder="assets/sprites/xyz.png" style="flex:1; background:#111; color:#eee; border:1px solid #444; border-radius:4px; padding:4px 6px; font-size:12px;">
+      <button class="secondary" onclick="loadCustom()">+</button>
+    </div>
+  </div>
+  <div id="main">
+    <div id="toolbar">
+      <strong id="currentName">—</strong>
+      <label>Zoom <input type="range" id="zoom" min="0.1" max="2" step="0.05" value="1"></label>
+      <label>anchor x <input type="number" id="ax" step="0.001"></label>
+      <label>anchor y <input type="number" id="ay" step="0.001"></label>
+      <label>scale <input type="number" id="ascale" step="0.01" value="1"></label>
+      <label><input type="checkbox" id="showGrid"> rács előnézet</label>
+      <label>N <input type="number" id="gridN" value="6" step="1" style="width:40px;"></label>
+      <label>TW <input type="number" id="gridTW" value="200.8" step="0.1" style="width:70px;"></label>
+      <span id="status"></span>
+    </div>
+    <div id="canvasWrap">
+      <div id="stage">
+        <img id="img" src="">
+        <canvas id="gridOverlay"></canvas>
+        <div class="marker" id="marker" hidden></div>
+      </div>
+    </div>
+    <div id="jsonPanel">
+      <div class="bar">
+        <button onclick="loadExisting()">sprites.json betöltése</button>
+        <button onclick="copyJson()">JSON másolása</button>
+        <button onclick="downloadJson()">Letöltés (sprites.json)</button>
+        <span id="jsonStatus" style="align-self:center; color:#9a9; font-size:12px;"></span>
+      </div>
+      <textarea id="jsonOut" spellcheck="false"></textarea>
+    </div>
+  </div>
+</div>
+<script>
+const SPRITES = ['crib','bed','nightstand','wardrobe','watch','box1x1','box1x2'];
+const SPRITE_FILES = {
+  crib: '../assets/sprites/bolcso.png',
+  bed: '../assets/sprites/agy.png',
+  nightstand: '../assets/sprites/ejjelisz.png',
+  wardrobe: '../assets/sprites/szekreny.png',
+  watch: '../assets/sprites/ora.png',
+  box1x1: '../assets/sprites/doboz_1x1.png',
+  box1x2: '../assets/sprites/doboz_1x2.png'
+};
+const ROOM_FILES = { room: '../assets/room/halo.png' };
+
+let data = { _comment: 'edited with tools/anchor_editor.html' };
+for (const k of SPRITES) data[k] = { anchor: {x:0.5, y:0.9}, scale: 1 };
+data._room = { originPx: { x: 0, y: 0 } };
+
+let current = null; // {key, isRoom, path}
+let naturalW = 0, naturalH = 0;
+
+function el(id){ return document.getElementById(id); }
+
+function buildLists() {
+  const sl = el('spriteList'); sl.innerHTML = '';
+  for (const k of SPRITES) {
+    const d = document.createElement('div');
+    d.className = 'item'; d.dataset.key = k;
+    d.innerHTML = `<img src="${SPRITE_FILES[k]}"><span>${k}</span>`;
+    d.onclick = () => select(k, false, SPRITE_FILES[k]);
+    sl.appendChild(d);
+  }
+  const rl = el('roomList'); rl.innerHTML = '';
+  for (const k in ROOM_FILES) {
+    const d = document.createElement('div');
+    d.className = 'item'; d.dataset.key = k;
+    d.innerHTML = `<img src="${ROOM_FILES[k]}"><span>${k} (origó)</span>`;
+    d.onclick = () => select(k, true, ROOM_FILES[k]);
+    rl.appendChild(d);
+  }
+}
+
+function loadCustom() {
+  const p = el('customPath').value.trim();
+  if (!p) return;
+  const key = '_custom_' + p.split('/').pop();
+  data[key] = data[key] || { anchor: {x:0.5,y:0.9}, scale:1 };
+  select(key, false, p.startsWith('..') || p.startsWith('http') ? p : '../' + p);
+}
+
+function select(key, isRoom, path) {
+  current = { key, isRoom, path };
+  document.querySelectorAll('.item').forEach(i => i.classList.toggle('active', i.dataset.key === key));
+  el('currentName').textContent = key + (isRoom ? ' (szoba)' : '');
+  const img = el('img');
+  img.onload = () => {
+    naturalW = img.naturalWidth; naturalH = img.naturalHeight;
+    layoutMarker();
+    drawGridOverlay();
+  };
+  img.src = path;
+  refreshFields();
+  el('ax').closest('label').style.display = isRoom ? 'none' : '';
+  el('ay').closest('label').style.display = isRoom ? 'none' : '';
+  el('ascale').closest('label').style.display = isRoom ? 'none' : '';
+  el('marker').className = 'marker' + (isRoom ? ' origin' : '');
+}
+
+function refreshFields() {
+  if (!current) return;
+  if (current.isRoom) {
+    const r = data._room.originPx;
+    el('status').textContent = `origó px: (${r.x.toFixed(1)}, ${r.y.toFixed(1)})`;
+  } else {
+    const s = data[current.key];
+    el('ax').value = s.anchor.x.toFixed(3);
+    el('ay').value = s.anchor.y.toFixed(3);
+    el('ascale').value = s.scale;
+    el('status').textContent = `${naturalW}x${naturalH}px`;
+  }
+  updateJsonPreview();
+}
+
+function layoutMarker() {
+  if (!current) return;
+  const m = el('marker');
+  m.hidden = false;
+  const zoom = parseFloat(el('zoom').value);
+  el('stage').style.transform = `scale(${zoom})`;
+  if (current.isRoom) {
+    const r = data._room.originPx;
+    m.style.left = r.x + 'px';
+    m.style.top = r.y + 'px';
+  } else {
+    const s = data[current.key];
+    m.style.left = (s.anchor.x * naturalW) + 'px';
+    m.style.top = (s.anchor.y * naturalH) + 'px';
+  }
+}
+
+function drawGridOverlay() {
+  const c = el('gridOverlay');
+  c.width = naturalW; c.height = naturalH;
+  c.style.width = naturalW + 'px'; c.style.height = naturalH + 'px';
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  if (!current || !current.isRoom || !el('showGrid').checked) return;
+  const N = parseInt(el('gridN').value) || 6;
+  const origin = data._room.originPx;
+  const TW = parseFloat(el('gridTW').value) || (naturalW * 0.24);
+  const TH = TW / 2;
+  ctx.strokeStyle = 'rgba(0,255,255,0.8)';
+  ctx.lineWidth = 1;
+  function iso(x,y){ return [origin.x + (x-y)*TW/2, origin.y + (x+y)*TH/2]; }
+  ctx.beginPath();
+  for (let gx=0; gx<=N; gx++){ const a=iso(gx,0), b=iso(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  for (let gy=0; gy<=N; gy++){ const a=iso(0,gy), b=iso(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+  ctx.stroke();
+  ctx.fillStyle = '#6bd1ff';
+  ctx.beginPath(); ctx.arc(origin.x, origin.y, 4, 0, 7); ctx.fill();
+}
+
+// dragging
+let dragging = false;
+el('marker').addEventListener('mousedown', e => { dragging = true; e.preventDefault(); });
+window.addEventListener('mouseup', () => dragging = false);
+window.addEventListener('mousemove', e => {
+  if (!dragging || !current) return;
+  const stage = el('stage');
+  const zoom = parseFloat(el('zoom').value);
+  const rect = stage.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / zoom;
+  const y = (e.clientY - rect.top) / zoom;
+  setPoint(x, y);
+});
+el('stage').addEventListener('click', e => {
+  if (e.target.id === 'marker') return;
+  const stage = el('stage');
+  const zoom = parseFloat(el('zoom').value);
+  const rect = stage.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / zoom;
+  const y = (e.clientY - rect.top) / zoom;
+  setPoint(x, y);
+});
+
+function setPoint(x, y) {
+  if (!current) return;
+  if (current.isRoom) {
+    data._room.originPx = { x: Math.round(x*10)/10, y: Math.round(y*10)/10 };
+  } else {
+    const fx = Math.min(1, Math.max(0, x / naturalW));
+    const fy = Math.min(1, Math.max(0, y / naturalH));
+    data[current.key].anchor = { x: Math.round(fx*1000)/1000, y: Math.round(fy*1000)/1000 };
+  }
+  layoutMarker();
+  drawGridOverlay();
+  refreshFields();
+}
+
+el('ax').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].anchor.x = parseFloat(el('ax').value)||0; layoutMarker(); }});
+el('ay').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].anchor.y = parseFloat(el('ay').value)||0; layoutMarker(); }});
+el('ascale').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].scale = parseFloat(el('ascale').value)||1; updateJsonPreview(); }});
+el('zoom').addEventListener('input', () => { layoutMarker(); });
+el('showGrid').addEventListener('change', drawGridOverlay);
+el('gridN').addEventListener('input', drawGridOverlay);
+el('gridTW').addEventListener('input', drawGridOverlay);
+
+function updateJsonPreview() {
+  el('jsonOut').value = JSON.stringify(data, null, 2);
+}
+
+async function loadExisting() {
+  try {
+    const res = await fetch('../assets/sprites.json?_=' + Date.now());
+    const j = await res.json();
+    data = Object.assign({ _room: { originPx: {x:0,y:0} } }, j);
+    for (const k of SPRITES) if (!data[k]) data[k] = { anchor:{x:0.5,y:0.9}, scale:1 };
+    if (!data._room) data._room = { originPx: {x:0,y:0} };
+    el('jsonStatus').textContent = 'betöltve.';
+    if (current) refreshFields();
+    layoutMarker();
+    updateJsonPreview();
+  } catch (e) {
+    el('jsonStatus').textContent = 'nem sikerült betölteni: ' + e.message;
+  }
+}
+
+function copyJson() {
+  updateJsonPreview();
+  navigator.clipboard.writeText(el('jsonOut').value).then(() => {
+    el('jsonStatus').textContent = 'vágólapra másolva.';
+  });
+}
+
+function downloadJson() {
+  updateJsonPreview();
+  const blob = new Blob([el('jsonOut').value], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'sprites.json';
+  a.click();
+}
+
+buildLists();
+updateJsonPreview();
+select('crib', false, SPRITE_FILES.crib);
+loadExisting();
+</script>
+</body>
+</html>

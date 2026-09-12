@@ -1,0 +1,11 @@
+{
+  "_comment": "Per-sprite render metadata, keyed by the same id used in game.js's images{} map. anchor.x/anchor.y are fractions (0-1) of the RAW image's own width/height, marking which point of the image should sit on the floor tile's target grid corner (usually the diamond's near/bottom point, sometimes its left point when the art's footprint is offset). scale corrects for sprites whose cutout has extra transparent padding around the drawn object, or that were sized against a different reference than the plate's TW/TH. Edit freely and reload -- no rebuild needed.",
+
+  "crib":       { "anchor": { "x": 0.5, "y": 0.86 }, "scale": 1.05 },
+  "bed":        { "anchor": { "x": 0.5, "y": 0.90 }, "scale": 1.25 },
+  "nightstand": { "anchor": { "x": 0.5, "y": 0.90 }, "scale": 1.10 },
+  "wardrobe":   { "anchor": { "x": 0.5, "y": 0.92 }, "scale": 1.20 },
+  "watch":      { "anchor": { "x": 0.5, "y": 0.70 }, "scale": 0.90 },
+  "box1x1":     { "anchor": { "x": 0.5, "y": 0.88 }, "scale": 1.00 },
+  "box1x2":     { "anchor": { "x": 0.5, "y": 0.88 }, "scale": 1.00 }
+}

@@ -7,11 +7,12 @@
    ============================================================ */
 
 // ---- measured off the plate (tools/measure_plate.py) ----
-const DIAMOND_W = 1205, DIAMOND_H = 605, GRID_N = 7;
-const TW = DIAMOND_W / GRID_N;   // 172.14
-const TH = DIAMOND_H / GRID_N;   // 86.43
+const DIAMOND_W = 1205, DIAMOND_H = 605, GRID_N = 6;
+const TW = DIAMOND_W / GRID_N;   // 200.83
+const TH = DIAMOND_H / GRID_N;   // 100.83
 const ZH = 64;                   // one z-level; deliberately not TH or TH/2
-const ORIGIN = { x: 720, y: 395 }; // plate's back apex == grid (0,0)
+let ORIGIN = { x: 720, y: 395 }; // plate's back apex == grid (0,0); overridden by
+                                  // assets/sprites.json's "_room.originPx" if present
 
 const DESIGN_W = 1448, DESIGN_H = 1086; // native plate resolution
 let scaleF = 1, offX = 0, offY = 0;
@@ -29,7 +30,10 @@ let stepBusy = false;
 const STEP_MS = 160;
 
 let images = {};
+let spriteMeta = {}; // assets/sprites.json -- per-sprite anchor point + scale
 let plateDesat = null; // cached desaturated plate for present era
+
+const DEFAULT_SPRITE_META = { anchor: { x: 0.5, y: 0.9 }, scale: 1 };
 
 /* ---------------- ASSETS ---------------- */
 
@@ -43,6 +47,11 @@ function preload() {
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
   images.box1x2 = loadImage('assets/sprites/doboz_1x2.png');
+  spriteMeta = loadJSON('assets/sprites.json');
+}
+
+function metaFor(imgKey) {
+  return spriteMeta[imgKey] || DEFAULT_SPRITE_META;
 }
 
 /* ---------------- ISO TRANSFORM ---------------- */
@@ -74,7 +83,7 @@ function makeEntities() {
       x: 3, y: 5, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'use', era: 'both', anchor: true,
-      img: 'crib', imgScale: 1.05, anchorPx: { x: 0.5, y: 0.86 }
+      img: 'crib'
     },
 
     // --- past-only furniture (the parents' room as it was) ---
@@ -86,7 +95,7 @@ function makeEntities() {
       x: 0, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
-      img: 'bed', imgScale: 1.25, anchorPx: { x: 0.5, y: 0.9 },
+      img: 'bed',
       lookText: 'A szüleim ágya. Ide bújtam be, ha rosszat álmodtam.'
     },
     {
@@ -94,7 +103,7 @@ function makeEntities() {
       x: 0, y: 3, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past', mirror: true,
-      img: 'nightstand', imgScale: 1.1, anchorPx: { x: 0.5, y: 0.9 },
+      img: 'nightstand',
       lookText: 'Apa órája és a szemüvege szokott itt lenni esténként.'
     },
     {
@@ -102,7 +111,7 @@ function makeEntities() {
       x: 0, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
-      img: 'wardrobe', imgScale: 1.2, anchorPx: { x: 0.5, y: 0.92 },
+      img: 'wardrobe',
       lookText: 'A nagy szekrény. Sosem értem fel a tetejét.'
     },
     {
@@ -110,7 +119,7 @@ function makeEntities() {
       x: 2, y: 2, z: 0, height: 0.2,
       push: false, blocking: false, stackable: false,
       interact: 'chase', era: 'past',
-      img: 'watch', imgScale: 0.9, anchorPx: { x: 0.5, y: 0.7 }
+      img: 'watch'
     },
 
     // --- present-only: boxes filling the same footprint area ---
@@ -119,7 +128,7 @@ function makeEntities() {
       x: 1, y: 4, z: 0, height: 1,
       push: 'axis', axis: 'y', blocking: true, stackable: true,
       interact: 'look', era: 'present',
-      img: 'box1x2', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 }, rotate: true,
+      img: 'box1x2',
       lookText: 'Anya ruhái, gondosan összehajtva. Sose látta ezt még senki.'
     },
     {
@@ -127,7 +136,7 @@ function makeEntities() {
       x: 0, y: 3, z: 0, height: 1,
       push: 'any', pull: true, blocking: true, stackable: true,
       interact: 'look', era: 'present',
-      img: 'box1x1', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 },
+      img: 'box1x1',
       lookText: 'Apa fiókjának tartalma. Az órája nincs itt. Sosem került elő.'
     },
     {
@@ -135,7 +144,7 @@ function makeEntities() {
       x: 0, y: 0, z: 0, height: 1,
       push: 'any', pull: true, blocking: true, stackable: true,
       interact: 'look', era: 'present',
-      img: 'box1x1', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 },
+      img: 'box1x1',
       lookText: 'Régi könyvek a szekrényből.'
     },
     {
@@ -143,14 +152,14 @@ function makeEntities() {
       x: 1, y: 0, z: 0, height: 1,
       push: 'any', pull: true, blocking: true, stackable: true,
       interact: 'look', era: 'present',
-      img: 'box1x1', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 },
+      img: 'box1x1',
       lookText: 'Kabátok, molyszagúan.'
     }
   ];
 }
 
 let entities = [];
-let actor = { x: 6, y: 5, z: 0, facing: { x: -1, y: 0 } };
+let actor = { x: 5, y: 5, z: 0, facing: { x: -1, y: 0 } };
 let undoStack = [];
 let watchFound = false;
 const WATCH_SPOT = { x: 5, y: 2 };
@@ -158,7 +167,7 @@ const WATCH_SPOT = { x: 5, y: 2 };
 function resetGame() {
   entities = makeEntities();
   era = 'present';
-  actor = { x: 6, y: 5, z: 0, facing: { x: -1, y: 0 } };
+  actor = { x: 5, y: 5, z: 0, facing: { x: -1, y: 0 } };
   undoStack = [];
   watchFound = false;
 }
@@ -196,6 +205,9 @@ function setup() {
   textFont('Georgia, serif');
   imageMode(CENTER);
   rectMode(CORNER);
+  if (spriteMeta._room && spriteMeta._room.originPx) {
+    ORIGIN = spriteMeta._room.originPx;
+  }
   resetGame();
   buildDesaturatedPlate();
 }
@@ -279,9 +291,6 @@ function drawScene() {
   imageMode(CENTER);
   image(plateImg, DESIGN_W / 2, DESIGN_H / 2);
 
-  // draw the crib (anchor) with its true color even in present's gray pass:
-  // easiest is to draw the desaturated plate + present furniture first,
-  // then the lightmap, then the anchor crib on top unaffected.
   const drawables = [];
 
   for (const e of activeEntities()) {
@@ -316,10 +325,11 @@ function drawEntity(e) {
   const p = iso(e.x + front.dx + 1, e.y + front.dy + 1, e.z);
   const img = images[e.img];
   if (!img) return;
-  const w = img.width * e.imgScale;
-  const h = img.height * e.imgScale;
-  const ax = e.anchorPx ? e.anchorPx.x : 0.5;
-  const ay = e.anchorPx ? e.anchorPx.y : 0.9;
+  const meta = metaFor(e.img);
+  const w = img.width * meta.scale;
+  const h = img.height * meta.scale;
+  const ax = meta.anchor.x;
+  const ay = meta.anchor.y;
 
   push();
   translate(p.x, p.y);
