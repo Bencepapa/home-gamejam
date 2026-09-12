@@ -164,7 +164,7 @@ function makeEntities() {
 }
 
 let entities = [];
-let actor = { x: 3, y: 5, z: 0, facing: { x: 0, y: -1 } };
+let actor = { x: 0, y: 5, z: 0, facing: { x: 0, y: -1 } };
 let undoStack = [];
 let watchFound = false;
 const WATCH_SPOT = { x: 1, y: 1 };
@@ -172,7 +172,7 @@ const WATCH_SPOT = { x: 1, y: 1 };
 function resetGame() {
   entities = makeEntities();
   era = 'present';
-  actor = { x: 3, y: 5, z: 0, facing: { x: 0, y: -1 } };
+  actor = { x: 0, y: 5, z: 0, facing: { x: 0, y: -1 } };
   undoStack = [];
   watchFound = false;
 }

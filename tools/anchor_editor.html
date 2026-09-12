@@ -68,7 +68,7 @@
     </div>
     <div id="calbar">
       <label><input type="checkbox" id="showGrid"> rács előnézet</label>
-      <label>N <input type="number" id="gridN" value="6" step="1" style="width:40px;"></label>
+      <label><span id="gridNLabel">N</span> <input type="number" id="gridN" value="6" step="1" style="width:40px;"></label>
       <label>TW <input type="number" id="gridTW" step="0.1"></label>
       <label>TH <input type="number" id="gridTH" step="0.1"></label>
       <span style="width:1px; height:18px; background:#444;"></span>
@@ -122,6 +122,10 @@ data._room = JSON.parse(JSON.stringify(DEFAULT_ROOM));
 
 let current = null; // {key, isRoom, path}
 let naturalW = 0, naturalH = 0;
+// sprite-mode grid PREVIEW tile count -- deliberately separate from
+// data._room.gridN (the game's actual grid size), so tweaking this for a
+// sprite's preview can never corrupt the real room grid when saved.
+let spritePreviewN = 2;
 
 // 3-point calibration state: click order is origin -> +x end -> +y end
 let calibrating = false;
@@ -178,7 +182,8 @@ function select(key, isRoom, path) {
 
 function refreshFields() {
   if (!current) return;
-  el('gridN').value = data._room.gridN || 6;
+  el('gridN').value = current.isRoom ? (data._room.gridN || 6) : spritePreviewN;
+  el('gridNLabel').textContent = current.isRoom ? 'N (rács méret)' : 'N (előnézet cellák)';
   el('gridTW').value = (data._room.tileW || 200).toFixed ? data._room.tileW.toFixed(2) : data._room.tileW;
   el('gridTH').value = (data._room.tileH || 100).toFixed ? data._room.tileH.toFixed(2) : data._room.tileH;
   if (current.isRoom) {
@@ -243,9 +248,10 @@ function drawGridOverlay() {
   } else {
     // sprite mode: draw an NxN grid whose FRONT (near/bottom) corner sits
     // exactly on the anchor marker, so multi-cell furniture can be checked
-    // against more than one tile. N comes from the shared "N" field.
+    // against more than one tile. N is preview-only (spritePreviewN),
+    // never data._room.gridN -- that field is the game's real grid size.
     const s = data[current.key];
-    const N = parseInt(el('gridN').value) || 1;
+    const N = spritePreviewN || 1;
     const ax = s.anchor.x * naturalW, ay = s.anchor.y * naturalH;
     // local grid coords: (N,N) must land exactly on (ax,ay)
     const originX = ax - N*axisX.x - N*axisY.x;
@@ -310,7 +316,12 @@ el('ay').addEventListener('input', () => { if(current && !current.isRoom){ data[
 el('ascale').addEventListener('input', () => { if(current && !current.isRoom){ data[current.key].scale = parseFloat(el('ascale').value)||1; updateJsonPreview(); }});
 el('zoom').addEventListener('input', () => { layoutMarker(); });
 el('showGrid').addEventListener('change', drawGridOverlay);
-el('gridN').addEventListener('input', () => { data._room.gridN = parseInt(el('gridN').value)||6; drawGridOverlay(); updateJsonPreview(); });
+el('gridN').addEventListener('input', () => {
+  const n = parseInt(el('gridN').value) || (current && current.isRoom ? 6 : 2);
+  if (current && current.isRoom) { data._room.gridN = n; updateJsonPreview(); }
+  else { spritePreviewN = n; } // never touches data._room -- preview only
+  drawGridOverlay();
+});
 el('gridTW').addEventListener('input', () => {
   const tw = parseFloat(el('gridTW').value)||0;
   data._room.tileW = tw;
