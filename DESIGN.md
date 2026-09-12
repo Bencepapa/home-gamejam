@@ -405,7 +405,7 @@ A napi bontás azon áll, hogy a **PC-s és a mobilos munka szét van választva
 
 ## 14. Nyitott kérdések
 
-- [ ] **Rácsméret és kameraszög** — a hálószobához ~7×7 járható terület kell a tolós fejtörőhöz. Papíron lerajzolni, mielőtt az első plate elkészül.
+- [x] **Rácsméret és kameraszög** — lezárva. A hálószoba plate-jét (`assets/room/halo.png`) kézzel bemérve: hátsó csúcs `(720, 395)`, bal `(95, 650)`, jobb `(1300, 655)`, elülső `(724, 1000)`. Ebből `DIAMOND_W = 1205px`, `DIAMOND_H = 605px`, `N = 7` → **`TW ≈ 172.1px`, `TH ≈ 86.4px`, arány 1.99:1 — gyakorlatilag pontos 2:1**. A motorban ezeket az értékeket (kerekítve `TW=172, TH=86`) használjuk közvetlenül, natív art-felbontáson, nem a korábbi `64/32` placeholder skálán. `ZH` erre `64` (nem fele és nem egyenlő `TH`-val). Lásd `tools/measure_plate.py` és `tools/composite_test.py`.
 - [ ] A padlóminta illeszkedjen a rácshoz, különben a dobozok látszólag a semmiben állnak meg.
 - [ ] A kergetett tárgy véglegesítése (öngyújtó vs. zsebóra).
 - [ ] A jam beadási felülete: itch.io vagy elég a Pages link? (itch feltöltés telefonról macerás.)

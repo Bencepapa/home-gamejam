@@ -1,42 +1,191 @@
 'use strict';
 
 /* ============================================================
-   HOME — a tiny p5.js point-and-click about getting back home
-   Rooms: Corridor (hub) / Parent's Room / Child's Room /
-          Living Room / Kitchen
+   HOME — isometric memory puzzle (parents' bedroom vertical slice)
+   Engine per DESIGN.md section 10. Grid + entity model, 2:1 dimetric
+   projection measured directly off assets/room/halo.png.
    ============================================================ */
 
-const DESIGN_W = 960;
-const DESIGN_H = 540;
+// ---- measured off the plate (tools/measure_plate.py) ----
+const DIAMOND_W = 1205, DIAMOND_H = 605, GRID_N = 7;
+const TW = DIAMOND_W / GRID_N;   // 172.14
+const TH = DIAMOND_H / GRID_N;   // 86.43
+const ZH = 64;                   // one z-level; deliberately not TH or TH/2
+const ORIGIN = { x: 720, y: 395 }; // plate's back apex == grid (0,0)
 
-let scaleF = 1;
-let offX = 0, offY = 0;
+const DESIGN_W = 1448, DESIGN_H = 1086; // native plate resolution
+let scaleF = 1, offX = 0, offY = 0;
 
 const STATE = { INTRO: 'intro', PLAY: 'play', WIN: 'win' };
 let state = STATE.INTRO;
+let era = 'present'; // 'present' | 'past'
 
-let currentRoom = 'corridor';
-let prevRoom = 'corridor';
-let transition = 0; // 0..1 fade
 let transitioning = false;
-let transitionTarget = null;
+let transitionT = 0;
+let pendingEra = null;
 
-let inventory = new Set();
-const NEEDED_ITEMS = ['keys', 'wallet', 'jacket', 'shoes'];
+let toast = null;
+let stepBusy = false;
+const STEP_MS = 160;
 
-let toast = null; // {text, t}
-let hoverHotspot = null;
-let particles = [];
-let bobT = 0;
+let images = {};
+let plateDesat = null; // cached desaturated plate for present era
 
-// simple mutable per-room state (toggle lights, drawers open, etc.)
-const roomState = {
-  corridor: { lightOn: true, closetOpen: false },
-  parent:   { lampOn: false, drawerOpen: false, bedMade: true, walletTaken: false },
-  child:    { toyOut: false, curtainsOpen: false, jacketTaken: false, lightOn: true },
-  living:   { tvOn: false, cushionFluffed: false, keysTaken: false },
-  kitchen:  { kettleOn: false, shoesTaken: false, fridgeOpen: false }
-};
+/* ---------------- ASSETS ---------------- */
+
+function preload() {
+  images.plate = loadImage('assets/room/halo.png');
+  images.lightmap = loadImage('assets/room/halo_lightmap.png');
+  images.crib = loadImage('assets/sprites/bolcso.png');
+  images.bed = loadImage('assets/sprites/agy.png');
+  images.wardrobe = loadImage('assets/sprites/szekreny.png');
+  images.nightstand = loadImage('assets/sprites/ejjelisz.png');
+  images.watch = loadImage('assets/sprites/ora.png');
+  images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
+  images.box1x2 = loadImage('assets/sprites/doboz_1x2.png');
+}
+
+/* ---------------- ISO TRANSFORM ---------------- */
+
+function iso(x, y, z = 0) {
+  return {
+    x: ORIGIN.x + (x - y) * TW / 2,
+    y: ORIGIN.y + (x + y) * TH / 2 - z * ZH
+  };
+}
+
+function inBounds(x, y) {
+  return x >= 0 && y >= 0 && x < GRID_N && y < GRID_N;
+}
+
+/* ---------------- ENTITY MODEL ----------------
+   cells: footprint offsets from (x,y). push: false|'any'|'axis'.
+   era: 'past' | 'present' | 'both'. anchor: true => never desaturated.
+------------------------------------------------- */
+
+function makeEntities() {
+  return [
+    // --- anchor object: same physical crib in both eras ---
+    // grid mapping (per user's ASCII floor plan): text-row -> x (grows
+    // toward the door wall), text-column reversed -> y (column 0 is the
+    // "-y" / right-up side along the window wall, so my_y = 5 - Y_text).
+    {
+      id: 'crib', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
+      x: 3, y: 5, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'use', era: 'both', anchor: true,
+      img: 'crib', imgScale: 1.05, anchorPx: { x: 0.5, y: 0.86 }
+    },
+
+    // --- past-only furniture (the parents' room as it was) ---
+    {
+      id: 'bed', cells: [
+        { dx: 0, dy: 0 }, { dx: 1, dy: 0 }, { dx: 2, dy: 0 },
+        { dx: 0, dy: 1 }, { dx: 1, dy: 1 }, { dx: 2, dy: 1 }
+      ],
+      x: 0, y: 4, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'look', era: 'past',
+      img: 'bed', imgScale: 1.25, anchorPx: { x: 0.5, y: 0.9 },
+      lookText: 'A szüleim ágya. Ide bújtam be, ha rosszat álmodtam.'
+    },
+    {
+      id: 'nightstand', cells: [{ dx: 0, dy: 0 }],
+      x: 0, y: 3, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'look', era: 'past', mirror: true,
+      img: 'nightstand', imgScale: 1.1, anchorPx: { x: 0.5, y: 0.9 },
+      lookText: 'Apa órája és a szemüvege szokott itt lenni esténként.'
+    },
+    {
+      id: 'wardrobe', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
+      x: 0, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'look', era: 'past',
+      img: 'wardrobe', imgScale: 1.2, anchorPx: { x: 0.5, y: 0.92 },
+      lookText: 'A nagy szekrény. Sosem értem fel a tetejét.'
+    },
+    {
+      id: 'watch', cells: [{ dx: 0, dy: 0 }],
+      x: 2, y: 2, z: 0, height: 0.2,
+      push: false, blocking: false, stackable: false,
+      interact: 'chase', era: 'past',
+      img: 'watch', imgScale: 0.9, anchorPx: { x: 0.5, y: 0.7 }
+    },
+
+    // --- present-only: boxes filling the same footprint area ---
+    {
+      id: 'box_bed_1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
+      x: 1, y: 4, z: 0, height: 1,
+      push: 'axis', axis: 'y', blocking: true, stackable: true,
+      interact: 'look', era: 'present',
+      img: 'box1x2', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 }, rotate: true,
+      lookText: 'Anya ruhái, gondosan összehajtva. Sose látta ezt még senki.'
+    },
+    {
+      id: 'box_nightstand', cells: [{ dx: 0, dy: 0 }],
+      x: 0, y: 3, z: 0, height: 1,
+      push: 'any', pull: true, blocking: true, stackable: true,
+      interact: 'look', era: 'present',
+      img: 'box1x1', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 },
+      lookText: 'Apa fiókjának tartalma. Az órája nincs itt. Sosem került elő.'
+    },
+    {
+      id: 'box_wardrobe_1', cells: [{ dx: 0, dy: 0 }],
+      x: 0, y: 0, z: 0, height: 1,
+      push: 'any', pull: true, blocking: true, stackable: true,
+      interact: 'look', era: 'present',
+      img: 'box1x1', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 },
+      lookText: 'Régi könyvek a szekrényből.'
+    },
+    {
+      id: 'box_wardrobe_2', cells: [{ dx: 0, dy: 0 }],
+      x: 1, y: 0, z: 0, height: 1,
+      push: 'any', pull: true, blocking: true, stackable: true,
+      interact: 'look', era: 'present',
+      img: 'box1x1', imgScale: 1, anchorPx: { x: 0.5, y: 0.88 },
+      lookText: 'Kabátok, molyszagúan.'
+    }
+  ];
+}
+
+let entities = [];
+let actor = { x: 6, y: 5, z: 0, facing: { x: -1, y: 0 } };
+let undoStack = [];
+let watchFound = false;
+const WATCH_SPOT = { x: 5, y: 2 };
+
+function resetGame() {
+  entities = makeEntities();
+  era = 'present';
+  actor = { x: 6, y: 5, z: 0, facing: { x: -1, y: 0 } };
+  undoStack = [];
+  watchFound = false;
+}
+
+function activeEntities() {
+  return entities.filter(e => e.era === era || e.era === 'both');
+}
+
+function entityAt(x, y, z, filterFn) {
+  for (const e of activeEntities()) {
+    if (filterFn && !filterFn(e)) continue;
+    for (const c of e.cells) {
+      if (e.x + c.dx === x && e.y + c.dy === y && e.z === z) return e;
+    }
+  }
+  return null;
+}
+
+function standable(x, y, z) {
+  if (!inBounds(x, y)) return false;
+  if (entityAt(x, y, z, e => e.blocking)) return false;
+  if (z === 0) return true;
+  const below = entityAt(x, y, z - 1, () => true);
+  return !!(below && below.stackable);
+}
+
+/* ---------------- SETUP / DRAW ---------------- */
 
 function setup() {
   const holder = document.getElementById('gameHolder');
@@ -45,7 +194,17 @@ function setup() {
   resizeCalc();
   noStroke();
   textFont('Georgia, serif');
+  imageMode(CENTER);
   rectMode(CORNER);
+  resetGame();
+  buildDesaturatedPlate();
+}
+
+function buildDesaturatedPlate() {
+  const g = createGraphics(images.plate.width, images.plate.height);
+  g.image(images.plate, 0, 0, g.width, g.height); // graphics buffers default to CORNER mode
+  g.filter(GRAY);
+  plateDesat = g;
 }
 
 function windowResized() {
@@ -68,815 +227,443 @@ function draw() {
   push();
   translate(offX, offY);
   scale(scaleF);
-
-  bobT += deltaTime * 0.001;
-  currentHotspots = [];
+  imageMode(CENTER);
 
   if (state === STATE.INTRO) {
     drawIntro();
-  } else if (state === STATE.PLAY) {
+  } else {
     updateTransition();
-    drawRoom(currentRoom);
+    drawScene();
     drawHUD();
-    if (transitioning) drawTransition();
-  } else if (state === STATE.WIN) {
-    drawRoom('corridor');
-    drawHUD();
-    updateParticles();
-    drawParticles();
-    drawWin();
+    if (transitioning) drawFade();
+    if (state === STATE.WIN) drawWinOverlay();
   }
-
   drawToast();
   pop();
 }
 
 /* ---------------- INTRO ---------------- */
 
+let introButton = null;
 function drawIntro() {
   background(18, 20, 28);
-  drawStars();
   push();
+  imageMode(CENTER);
+  tint(255, 60);
+  image(images.plate, DESIGN_W / 2, DESIGN_H / 2, images.plate.width * 0.7, images.plate.height * 0.7);
+  noTint();
   textAlign(CENTER, CENTER);
   fill(255, 236, 200);
   textSize(52);
-  text('HOME', DESIGN_W / 2, DESIGN_H / 2 - 70);
-  fill(220);
-  textSize(18);
-  text('It has been a long day. Find your keys, wallet, jacket and shoes,', DESIGN_W / 2, DESIGN_H / 2 - 10);
-  text('then step out the front door.', DESIGN_W / 2, DESIGN_H / 2 + 16);
+  text('HOME', DESIGN_W / 2, DESIGN_H / 2 - 160);
+  fill(230);
+  textSize(20);
+  text('A szülők egykori hálószobája. Valamit ott hagytál benne.', DESIGN_W / 2, DESIGN_H / 2 - 90);
 
-  const bw = 220, bh = 56;
-  const bx = DESIGN_W / 2 - bw / 2, by = DESIGN_H / 2 + 60;
+  const bw = 260, bh = 60;
+  const bx = DESIGN_W / 2 - bw / 2, by = DESIGN_H / 2 - 30;
   const hover = pointInRect(mouseDesign(), bx, by, bw, bh);
   fill(hover ? color(255, 200, 120) : color(230, 170, 90));
   rect(bx, by, bw, bh, 12);
   fill(30, 20, 10);
   textSize(22);
-  text('Tap to Start', DESIGN_W / 2, by + bh / 2 + 2);
-  pop();
+  text('Belépek', DESIGN_W / 2, by + bh / 2 + 2);
   introButton = { x: bx, y: by, w: bw, h: bh };
+  pop();
 }
 
-let introButton = null;
+/* ---------------- SCENE ---------------- */
 
-function drawStars() {
-  randomSeed(42);
-  fill(255, 255, 255, 60);
-  for (let i = 0; i < 60; i++) {
-    const x = random(DESIGN_W);
-    const y = random(DESIGN_H * 0.6);
-    const s = random(1, 2.5);
-    ellipse(x, y, s, s);
+function drawScene() {
+  const plateImg = (era === 'present') ? plateDesat : images.plate;
+  imageMode(CENTER);
+  image(plateImg, DESIGN_W / 2, DESIGN_H / 2);
+
+  // draw the crib (anchor) with its true color even in present's gray pass:
+  // easiest is to draw the desaturated plate + present furniture first,
+  // then the lightmap, then the anchor crib on top unaffected.
+  const drawables = [];
+
+  for (const e of activeEntities()) {
+    const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
+    const depth = (e.x + front.dx + e.y + front.dy) * 1000 + e.z * 10 + 2;
+    drawables.push({ depth, draw: () => drawEntity(e) });
   }
+
+  {
+    const depth = (actor.x + actor.y) * 1000 + actor.z * 10 + 2;
+    drawables.push({ depth, draw: () => drawActor() });
+  }
+
+  drawables.sort((a, b) => a.depth - b.depth);
+  for (const d of drawables) d.draw();
+
+  // lightmap glow, low opacity per art direction
+  push();
+  tint(255, 255, 255, 38); // ~15%
+  imageMode(CENTER);
+  image(images.lightmap, DESIGN_W / 2, DESIGN_H / 2);
+  noTint();
+  pop();
+
+  if (DEBUG_GRID) drawDebugGrid();
 }
 
-/* ---------------- HUD / INVENTORY ---------------- */
+function drawEntity(e) {
+  // unsliced sprite: anchor at the near (screen-lowest) corner of the
+  // frontmost cell in its footprint, not the footprint's center.
+  const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
+  const p = iso(e.x + front.dx + 1, e.y + front.dy + 1, e.z);
+  const img = images[e.img];
+  if (!img) return;
+  const w = img.width * e.imgScale;
+  const h = img.height * e.imgScale;
+  const ax = e.anchorPx ? e.anchorPx.x : 0.5;
+  const ay = e.anchorPx ? e.anchorPx.y : 0.9;
 
+  push();
+  translate(p.x, p.y);
+  if (e.mirror) scale(-1, 1);
+  imageMode(CORNER);
+  const highlight = e.interact && state === STATE.PLAY && isFacingEntity(e);
+  if (highlight) {
+    drawingContext.shadowColor = 'rgba(255,220,140,0.9)';
+    drawingContext.shadowBlur = 20;
+  }
+  image(img, -w * ax, -h * ay, w, h);
+  if (highlight) drawingContext.shadowBlur = 0;
+  pop();
+}
+
+function drawActor() {
+  const p = iso(actor.x, actor.y, actor.z);
+  const isBaby = era === 'past';
+  const bodyH = isBaby ? 34 : 64;
+  const bodyW = isBaby ? 26 : 34;
+  push();
+  translate(p.x, p.y);
+  noStroke();
+  fill(0, 0, 0, 90);
+  ellipse(0, -2, bodyW * 1.1, bodyW * 0.5);
+  fill(20, 18, 26);
+  rectMode(CENTER);
+  rect(0, -bodyH * 0.55, bodyW, bodyH, bodyW * 0.4);
+  circle(0, -bodyH - 4, bodyW * 0.7);
+  fill(255, 220, 150);
+  const fx = actor.facing.x, fy = actor.facing.y;
+  const rel = iso(fx * 0.35, fy * 0.35); // relative offset only
+  circle(rel.x - ORIGIN.x, rel.y - ORIGIN.y - bodyH - 4, 5);
+  pop();
+}
+
+function isFacingEntity(e) {
+  const fx = actor.x + actor.facing.x, fy = actor.y + actor.facing.y;
+  return e.cells.some(c => e.x + c.dx === fx && e.y + c.dy === fy);
+}
+
+const DEBUG_GRID = false;
+function drawDebugGrid() {
+  stroke(0, 255, 255, 90);
+  strokeWeight(1);
+  for (let gx = 0; gx <= GRID_N; gx++) {
+    const a = iso(gx, 0), b = iso(gx, GRID_N);
+    line(a.x, a.y, b.x, b.y);
+  }
+  for (let gy = 0; gy <= GRID_N; gy++) {
+    const a = iso(0, gy), b = iso(GRID_N, gy);
+    line(a.x, a.y, b.x, b.y);
+  }
+  noStroke();
+}
+
+/* ---------------- HUD ---------------- */
+
+let undoButton = null;
 function drawHUD() {
   push();
-  const items = [
-    { id: 'keys', label: 'Keys', icon: drawIconKeys },
-    { id: 'wallet', label: 'Wallet', icon: drawIconWallet },
-    { id: 'jacket', label: 'Jacket', icon: drawIconJacket },
-    { id: 'shoes', label: 'Shoes', icon: drawIconShoes }
-  ];
-  const slotW = 54, slotH = 54, gap = 10;
-  const totalW = items.length * slotW + (items.length - 1) * gap;
-  let x = DESIGN_W - totalW - 16;
-  const y = 14;
-  for (const it of items) {
-    const has = inventory.has(it.id);
-    fill(0, 0, 0, 120);
-    rect(x, y, slotW, slotH, 10);
-    fill(has ? color(90, 200, 120, 220) : color(60, 60, 70, 160));
-    rect(x + 2, y + 2, slotW - 4, slotH - 4, 8);
-    push();
-    translate(x + slotW / 2, y + slotH / 2);
-    if (!has) { fill(255, 255, 255, 40); } else { fill(255); }
-    it.icon(0, 0, has ? 1 : 0.7);
-    pop();
-    x += slotW + gap;
-  }
-
-  // room label + back button (if not corridor)
   fill(0, 0, 0, 130);
-  rect(12, 12, 170, 36, 8);
+  rect(12, 12, 220, 36, 8);
   fill(255, 235, 210);
   textAlign(LEFT, CENTER);
   textSize(16);
-  text(roomTitle(currentRoom), 22, 30);
+  text(era === 'present' ? 'Jelen — a szoba most' : 'Múlt — az emlék', 22, 30);
 
-  if (currentRoom !== 'corridor') {
-    const bx = 12, by = 56, bw = 100, bh = 32;
-    const hov = pointInRect(mouseDesign(), bx, by, bw, bh);
-    fill(hov ? color(230, 170, 90) : color(0, 0, 0, 130));
-    rect(bx, by, bw, bh, 8);
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(14);
-    text('← Corridor', bx + bw / 2, by + bh / 2 + 1);
-    backButton = { x: bx, y: by, w: bw, h: bh };
-  } else {
-    backButton = null;
-  }
+  const bw = 90, bh = 60;
+  const bx = 12, by = DESIGN_H - bh - 16;
+  const hov = pointInRect(mouseDesign(), bx, by, bw, bh);
+  fill(hov ? color(230, 170, 90) : color(0, 0, 0, 140));
+  rect(bx, by, bw, bh, 10);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(28);
+  text('↺', bx + bw / 2, by + bh / 2 - 4);
+  textSize(11);
+  text('vissza', bx + bw / 2, by + bh / 2 + 20);
+  undoButton = { x: bx, y: by, w: bw, h: bh };
+
+  // mobile action button
+  const abw = 90, abh = 90;
+  const abx = DESIGN_W - abw - 24, aby = DESIGN_H - abh - 24;
+  const ahov = pointInRect(mouseDesign(), abx, aby, abw, abh);
+  fill(ahov ? color(255, 210, 140) : color(230, 170, 90, 220));
+  circle(abx + abw / 2, aby + abh / 2, abw);
+  fill(30, 20, 10);
+  textSize(14);
+  text('interakció', abx + abw / 2, aby + abh / 2);
+  actionButton = { x: abx, y: aby, w: abw, h: abh };
   pop();
 }
 
-let backButton = null;
+let actionButton = null;
 
-function roomTitle(r) {
-  return {
-    corridor: 'Corridor',
-    parent: "Parent's Room",
-    child: "Child's Room",
-    living: 'Living Room',
-    kitchen: 'Kitchen'
-  }[r];
-}
+/* ---------------- TRANSITION (era fade) ---------------- */
 
-/* ---------------- TRANSITION ---------------- */
-
-function drawTransition() {
-  const alpha = (1 - abs(transition - 1)) * 255;
-  fill(10, 12, 16, alpha);
-  rect(0, 0, DESIGN_W, DESIGN_H);
-}
-
-function goToRoom(name) {
-  if (transitioning || name === currentRoom) return;
+function startEraTransition(nextEra) {
   transitioning = true;
-  transitionTarget = name;
-  transition = 0;
+  transitionT = 0;
+  pendingEra = nextEra;
 }
 
 function updateTransition() {
   if (!transitioning) return;
-  transition += 0.08;
-  if (transition >= 1 && transitionTarget) {
-    currentRoom = transitionTarget;
-    transitionTarget = null;
+  transitionT += 0.05;
+  if (transitionT >= 1 && pendingEra) {
+    era = pendingEra;
+    pendingEra = null;
   }
-  if (transition >= 2) {
+  if (transitionT >= 2) {
     transitioning = false;
-    transition = 0;
+    transitionT = 0;
   }
+}
+
+function drawFade() {
+  const alpha = (1 - abs(transitionT - 1)) * 255;
+  fill(6, 6, 10, alpha);
+  rect(0, 0, DESIGN_W, DESIGN_H);
 }
 
 /* ---------------- WIN ---------------- */
 
-function drawWin() {
-  fill(10, 14, 10, 210);
+function drawWinOverlay() {
+  fill(10, 14, 10, 180);
   rect(0, 0, DESIGN_W, DESIGN_H);
   textAlign(CENTER, CENTER);
   fill(255, 236, 200);
-  textSize(46);
-  text('You made it home.', DESIGN_W / 2, DESIGN_H / 2 - 30);
+  textSize(40);
+  text('Megtaláltad apa óráját.', DESIGN_W / 2, DESIGN_H / 2 - 20);
   fill(220);
-  textSize(18);
-  text('Thanks for playing.', DESIGN_W / 2, DESIGN_H / 2 + 16);
-
-  const bw = 200, bh = 50;
-  const bx = DESIGN_W / 2 - bw / 2, by = DESIGN_H / 2 + 60;
-  const hov = pointInRect(mouseDesign(), bx, by, bw, bh);
-  fill(hov ? color(255, 200, 120) : color(230, 170, 90));
-  rect(bx, by, bw, bh, 10);
-  fill(30, 20, 10);
-  textSize(18);
-  text('Play Again', DESIGN_W / 2, by + bh / 2 + 1);
-  winButton = { x: bx, y: by, w: bw, h: bh };
+  textSize(16);
+  text('(demó vége — a hálószoba-jelenet)', DESIGN_W / 2, DESIGN_H / 2 + 16);
 }
-
-let winButton = null;
 
 /* ---------------- TOAST ---------------- */
 
 function showToast(text) {
-  toast = { text, t: 2.4 };
+  toast = { text, t: 3.2 };
 }
 
 function drawToast() {
   if (!toast) return;
   toast.t -= deltaTime * 0.001;
   if (toast.t <= 0) { toast = null; return; }
-  const alpha = constrain(toast.t / 2.4, 0, 1) * 255;
+  const alpha = constrain(toast.t / 3.2, 0, 1) * 255;
   push();
   textAlign(CENTER, CENTER);
-  textSize(18);
-  const w = min(DESIGN_W - 40, textWidth(toast.text) + 40);
-  const bx = DESIGN_W / 2 - w / 2, by = DESIGN_H - 78, bh = 44;
-  fill(0, 0, 0, alpha * 0.7);
+  textSize(19);
+  textWrap(WORD);
+  const w = 700;
+  const bx = DESIGN_W / 2 - w / 2, by = DESIGN_H - 130, bh = 70;
+  fill(0, 0, 0, alpha * 0.72);
   rect(bx, by, w, bh, 10);
   fill(255, 240, 220, alpha);
-  text(toast.text, DESIGN_W / 2, by + bh / 2 + 1);
+  text(toast.text, DESIGN_W / 2, by + bh / 2, w - 40);
   pop();
 }
 
-/* ---------------- INPUT HELPERS ---------------- */
+/* ---------------- INPUT ---------------- */
 
-function mouseDesign() {
-  return toDesign(mouseX, mouseY);
+function mouseDesign() { return toDesign(mouseX, mouseY); }
+function pointInRect(p, x, y, w, h) { return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; }
+
+const DIRS = {
+  right: { x: 1, y: 0 }, left: { x: -1, y: 0 },
+  down: { x: 0, y: 1 }, up: { x: 0, y: -1 }
+};
+
+function keyPressed() {
+  if (state !== STATE.PLAY || transitioning) return;
+  if (['ArrowRight', 'd', 'D'].includes(key)) tryStep(DIRS.right, keyIsDown(16));
+  else if (['ArrowLeft', 'a', 'A'].includes(key)) tryStep(DIRS.left, keyIsDown(16));
+  else if (['ArrowDown', 's', 'S'].includes(key)) tryStep(DIRS.down, keyIsDown(16));
+  else if (['ArrowUp', 'w', 'W'].includes(key)) tryStep(DIRS.up, keyIsDown(16));
+  else if (key === ' ') doInteract();
 }
 
-function pointInRect(p, x, y, w, h) {
-  return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h;
+function tryStep(dir, pulling) {
+  if (stepBusy) return;
+  stepBusy = true;
+  setTimeout(() => stepBusy = false, STEP_MS);
+
+  if (pulling) { tryPull(dir); return; }
+
+  const tx = actor.x + dir.x, ty = actor.y + dir.y;
+  actor.facing = dir;
+  if (!inBounds(tx, ty)) return;
+
+  const blocker = entityAt(tx, ty, actor.z, e => e.blocking);
+  if (!blocker) {
+    if (standable(tx, ty, actor.z)) { actor.x = tx; actor.y = ty; }
+    else if (standable(tx, ty, actor.z + 1)) { actor.x = tx; actor.y = ty; actor.z = actor.z + 1; }
+    return;
+  }
+  if (canPush(blocker, dir)) {
+    saveUndo();
+    for (const c of blocker.cells) {} // footprint moves as a whole
+    blocker.x += dir.x; blocker.y += dir.y;
+    actor.x = tx; actor.y = ty;
+  }
+  // else: blocked, just faced it
 }
 
-function pointInCircle(p, cx, cy, r) {
-  return dist(p.x, p.y, cx, cy) <= r;
+function canPush(e, dir) {
+  if (!e.push) return false;
+  if (e.push === 'axis') {
+    const alongY = (dir.x === 0);
+    if (alongY && e.axis !== 'y') return false;
+    if (!alongY && e.axis !== 'x') return false;
+  }
+  for (const c of e.cells) {
+    const nx = e.x + c.dx + dir.x, ny = e.y + c.dy + dir.y;
+    if (!inBounds(nx, ny)) return false;
+    const occupant = entityAt(nx, ny, e.z, other => other.blocking && other !== e);
+    if (occupant && occupant !== e) return false;
+  }
+  return true;
 }
 
-/* ---------------- ICONS (vector, no assets needed) ---------------- */
-
-function drawIconKeys(x, y, a) {
-  push();
-  translate(x, y);
-  noFill();
-  stroke(255, 255 * a);
-  strokeWeight(3);
-  circle(-8, 0, 12);
-  line(-2, 0, 14, 0);
-  line(10, 0, 10, 6);
-  line(14, 0, 14, 8);
-  noStroke();
-  pop();
+function tryPull(dir) {
+  const front = { x: actor.x + actor.facing.x, y: actor.y + actor.facing.y };
+  const e = entityAt(front.x, front.y, actor.z, o => o.pull);
+  if (!e) return;
+  const back = { x: actor.x - actor.facing.x, y: actor.y - actor.facing.y };
+  if (!inBounds(back.x, back.y) || !standable(back.x, back.y, actor.z)) return;
+  saveUndo();
+  e.x += (actor.x - back.x); e.y += (actor.y - back.y);
+  actor.x = back.x; actor.y = back.y;
 }
 
-function drawIconWallet(x, y, a) {
-  push();
-  translate(x, y);
-  fill(120, 80, 50, 255 * a);
-  rect(-14, -10, 28, 20, 3);
-  fill(230, 190, 90, 255 * a);
-  rect(2, -4, 10, 8, 2);
-  pop();
-}
+function doInteract() {
+  const fx = actor.x + actor.facing.x, fy = actor.y + actor.facing.y;
+  const e = entityAt(fx, fy, actor.z, () => true) ||
+    activeEntities().find(ent => ent.cells.some(c => ent.x + c.dx === fx && ent.y + c.dy === fy));
+  if (!e) return;
 
-function drawIconJacket(x, y, a) {
-  push();
-  translate(x, y);
-  fill(70, 110, 170, 255 * a);
-  beginShape();
-  vertex(-14, -12);
-  vertex(-4, -16);
-  vertex(0, -10);
-  vertex(4, -16);
-  vertex(14, -12);
-  vertex(9, -2);
-  vertex(6, -6);
-  vertex(6, 16);
-  vertex(-6, 16);
-  vertex(-6, -6);
-  vertex(-9, -2);
-  endShape(CLOSE);
-  pop();
-}
-
-function drawIconShoes(x, y, a) {
-  push();
-  translate(x, y);
-  fill(200, 60, 60, 255 * a);
-  ellipse(-6, 4, 20, 10);
-  rect(-14, -2, 10, 8, 3);
-  pop();
-}
-
-/* ---------------- GENERIC ROOM HELPERS ---------------- */
-
-function drawWallsFloor(wallColor, floorColor) {
-  fill(wallColor);
-  rect(0, 0, DESIGN_W, DESIGN_H * 0.62);
-  fill(floorColor);
-  rect(0, DESIGN_H * 0.62, DESIGN_W, DESIGN_H * 0.38);
-}
-
-function drawWindow(x, y, w, h, skyTop, skyBottom) {
-  fill(60, 45, 30);
-  rect(x - 8, y - 8, w + 16, h + 16, 4);
-  let ctx = drawingContext;
-  const grad = ctx.createLinearGradient(0, y, 0, y + h);
-  grad.addColorStop(0, skyTop);
-  grad.addColorStop(1, skyBottom);
-  ctx.fillStyle = grad;
-  ctx.fillRect(x, y, w, h);
-  stroke(60, 45, 30);
-  strokeWeight(4);
-  line(x + w / 2, y, x + w / 2, y + h);
-  line(x, y + h / 2, x + w, y + h / 2);
-  noStroke();
-}
-
-function drawDoor(x, y, w, h, dcolor, label) {
-  fill(dcolor);
-  rect(x, y, w, h, 4);
-  fill(0, 0, 0, 60);
-  rect(x, y, w, 6);
-  fill(230, 200, 120);
-  circle(x + w - 12, y + h / 2, 8);
-  if (label) {
-    push();
-    textAlign(CENTER, CENTER);
-    fill(255, 255, 255, 210);
-    textSize(13);
-    fill(0, 0, 0, 140);
-    rect(x + w / 2 - 46, y - 26, 92, 20, 6);
-    fill(255);
-    text(label, x + w / 2, y - 16);
-    pop();
+  if (e.id === 'crib' && era === 'present') {
+    showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
+    startEraTransition('past');
+    setTimeout(() => {
+      actor.x = 3; actor.y = 5; actor.facing = { x: 0, y: -1 }; actor.z = 0;
+    }, 900);
+    return;
+  }
+  if (e.id === 'crib' && era === 'past') {
+    showToast('A saját bölcsőm. Furcsa innen nézni.');
+    return;
+  }
+  if (e.interact === 'look' && e.lookText) {
+    showToast(e.lookText);
+    return;
+  }
+  if (e.interact === 'chase') {
+    chaseWatch(e);
+    return;
   }
 }
 
-function hotspotGlow(x, y, w, h, active) {
-  if (!active) return;
-  push();
-  noFill();
-  stroke(255, 230, 150, 180 + 60 * sin(bobT * 4));
-  strokeWeight(2);
-  rect(x - 3, y - 3, w + 6, h + 6, 6);
-  noStroke();
-  pop();
+function chaseWatch(watch) {
+  const options = [
+    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
+  ].map(d => ({ x: watch.x + d.x, y: watch.y + d.y }))
+   .filter(p => inBounds(p.x, p.y) && standable(p.x, p.y, 0));
+
+  watch.chaseSteps = (watch.chaseSteps || 0) + 1;
+  if (watch.chaseSteps >= 3 || options.length === 0) {
+    entities = entities.filter(e => e.id !== 'watch');
+    showToast('Az óra begurul a szekrény alá és eltűnik.');
+    setTimeout(() => {
+      showToast('A baba felsír.');
+      setTimeout(() => {
+        startEraTransition('present');
+        setTimeout(() => {
+          actor.x = 4; actor.y = 3; actor.facing = { x: 0, y: -1 };
+          showToast('Csend van. Csak a szoba.');
+        }, 900);
+      }, 1400);
+    }, 900);
+    return;
+  }
+  const next = random(options);
+  watch.x = next.x; watch.y = next.y;
+  showToast('Az óra elgurul előled.');
 }
 
-/* ============================================================
-   ROOM DEFINITIONS
-   Each room: draw(), hotspots array {x,y,w,h,onTap}
-   ============================================================ */
-
-function drawRoom(name) {
-  hoverHotspot = null;
-  const rooms = { corridor: roomCorridor, parent: roomParent, child: roomChild, living: roomLiving, kitchen: roomKitchen };
-  rooms[name]();
+function saveUndo() {
+  undoStack.push({
+    actor: { x: actor.x, y: actor.y, z: actor.z, facing: { ...actor.facing } },
+    ents: entities.filter(e => e.push).map(e => ({ id: e.id, x: e.x, y: e.y, z: e.z }))
+  });
+  if (undoStack.length > 50) undoStack.shift();
 }
 
-/* ---------- CORRIDOR (hub) ---------- */
-
-function roomCorridor() {
-  const st = roomState.corridor;
-  drawWallsFloor(color(st.lightOn ? '#3b3550' : '#211d2c'), color('#5a4632'));
-
-  // ceiling light
-  fill(st.lightOn ? color(255, 240, 200) : color(90, 90, 90));
-  ellipse(DESIGN_W / 2, 40, 26, 14);
-
-  // floor runner rug
-  fill(150, 40, 40);
-  rect(DESIGN_W / 2 - 90, DESIGN_H * 0.66, 180, DESIGN_H * 0.3);
-
-  // Four room doors along the corridor
-  const doors = [
-    { room: 'parent', x: 55, label: 'Parents' , c: '#7a5a3a'},
-    { room: 'child', x: 230, label: 'Kids Room', c: '#3a6a7a' },
-    { room: 'living', x: 615, label: 'Living Room', c: '#6a5a3a' },
-    { room: 'kitchen', x: 790, label: 'Kitchen', c: '#4a6a3a' }
-  ];
-  const dy = 210, dw = 110, dh = 220;
-  for (const d of doors) {
-    drawDoor(d.x, dy, dw, dh, color(d.c), d.label);
-    addHotspot(d.x, dy, dw, dh, () => goToRoom(d.room));
-  }
-
-  // closet (flavor interact)
-  fill('#3a3345');
-  rect(2, 260, 45, 170, 3);
-  if (st.closetOpen) {
-    fill(20, 15, 25);
-    rect(7, 266, 35, 158);
-    fill(200, 170, 90);
-    rect(11, 280, 8, 40);
-    rect(24, 280, 8, 40);
-  }
-  addHotspot(2, 260, 45, 170, () => {
-    st.closetOpen = !st.closetOpen;
-    showToast(st.closetOpen ? 'You open the closet. Old coats.' : 'You close the closet.');
-  });
-
-  // light switch
-  fill(220);
-  rect(925, 300, 14, 20, 2);
-  addHotspot(915, 290, 40, 40, () => {
-    st.lightOn = !st.lightOn;
-    showToast(st.lightOn ? 'Lights on.' : 'Lights off.');
-  });
-
-  // FRONT DOOR (exit)
-  const allHave = NEEDED_ITEMS.every(i => inventory.has(i));
-  const fx = DESIGN_W / 2 - 70, fy = 150, fw = 140, fh = 280;
-  fill(allHave ? color('#8a6a3a') : color('#5a4a30'));
-  rect(fx, fy, fw, fh, 6);
-  fill(0, 0, 0, 70);
-  rect(fx, fy, fw, 8);
-  fill(allHave ? color(255, 220, 130) : color(160, 140, 110));
-  circle(fx + fw - 18, fy + fh / 2, 10);
-  push();
-  textAlign(CENTER, CENTER);
-  fill(255);
-  textSize(14);
-  fill(0, 0, 0, 150);
-  rect(fx + fw / 2 - 60, fy - 30, 120, 22, 6);
-  fill(allHave ? color(160, 255, 170) : color(255));
-  text(allHave ? 'Front Door — Go Home!' : 'Front Door (locked)', fx + fw / 2, fy - 19);
-  pop();
-  addHotspot(fx, fy, fw, fh, () => {
-    if (allHave) {
-      state = STATE.WIN;
-      spawnConfetti();
-    } else {
-      const missing = NEEDED_ITEMS.filter(i => !inventory.has(i));
-      showToast(`You still need: ${missing.map(labelFor).join(', ')}`);
-    }
-  });
-
-  handleHotspots();
-}
-
-function labelFor(id) {
-  return { keys: 'keys', wallet: 'wallet', jacket: 'jacket', shoes: 'shoes' }[id];
-}
-
-/* ---------- PARENT'S ROOM ---------- */
-
-function roomParent() {
-  const st = roomState.parent;
-  drawWallsFloor(color('#4a3f55'), color('#6b4f36'));
-  drawWindow(700, 60, 170, 130, '#1a1a3a', '#5a4a7a');
-
-  // bed
-  fill('#5b3b2b');
-  rect(60, 300, 260, 130, 6);
-  fill(st.bedMade ? color('#c9d6e8') : color('#8f97a6'));
-  rect(70, 300, 240, 60, 6);
-  fill('#e7c7c7');
-  rect(80, 300, 60, 30, 4);
-  addHotspot(60, 300, 260, 130, () => {
-    st.bedMade = !st.bedMade;
-    showToast(st.bedMade ? 'You make the bed.' : 'You rumple the sheets.');
-  });
-
-  // lamp on nightstand
-  fill('#3a2a1f');
-  rect(330, 330, 40, 60, 3);
-  fill(st.lampOn ? color(255, 235, 160) : color(120, 110, 90));
-  ellipse(350, 320, 34, 20);
-  addHotspot(330, 300, 40, 40, () => {
-    st.lampOn = !st.lampOn;
-    showToast(st.lampOn ? 'You switch on the lamp.' : 'You switch off the lamp.');
-  });
-
-  // dresser with drawer (wallet inside)
-  fill('#4a3323');
-  rect(600, 340, 180, 100, 4);
-  fill('#332217');
-  rect(615, st.drawerOpen ? 400 : 360, 150, 30, 3);
-  if (st.drawerOpen && !st.walletTaken) {
-    fill(120, 80, 50);
-    rect(660, 402, 26, 18, 2);
-  }
-  addHotspot(600, 340, 180, 100, () => {
-    if (!st.drawerOpen) {
-      st.drawerOpen = true;
-      showToast('You slide open the drawer.');
-    } else if (!st.walletTaken) {
-      st.walletTaken = true;
-      inventory.add('wallet');
-      showToast('You grab your wallet.');
-    } else {
-      showToast('The drawer is empty now.');
-    }
-  });
-
-  // mirror (flavor)
-  fill('#2a2436');
-  rect(450, 160, 80, 110, 40);
-  fill(200, 210, 230, 120);
-  rect(460, 170, 60, 90, 34);
-  addHotspot(450, 160, 80, 110, () => showToast('You look tired but ready for tomorrow.'));
-
-  handleHotspots();
-}
-
-/* ---------- CHILD'S ROOM ---------- */
-
-function roomChild() {
-  const st = roomState.child;
-  drawWallsFloor(color(st.lightOn ? '#3a5560' : '#22323a'), color('#7a6a45'));
-  drawWindow(80, 60, 150, 110, '#20305a', '#7ea6cf');
-  if (st.curtainsOpen) {
-    fill(220, 120, 120, 0);
-  }
-  fill('#c76b6b');
-  if (!st.curtainsOpen) {
-    rect(70, 50, 40, 130, 2);
-    rect(220, 50, 40, 130, 2);
-  } else {
-    rect(65, 50, 18, 130, 2);
-    rect(250, 50, 18, 130, 2);
-  }
-  addHotspot(70, 50, 190, 130, () => {
-    st.curtainsOpen = !st.curtainsOpen;
-    showToast(st.curtainsOpen ? 'You open the curtains.' : 'You close the curtains.');
-  });
-
-  // bunk-ish bed
-  fill('#6b4a30');
-  rect(500, 300, 260, 130, 6);
-  fill('#e8dca0');
-  rect(510, 300, 240, 60, 6);
-  fill('#c76b8a');
-  ellipse(560, 320, 40, 26);
-  addHotspot(500, 300, 260, 130, () => showToast('Small bed, big dreams.'));
-
-  // toy box (jacket hidden under toys, whimsical)
-  fill('#3a6a4a');
-  rect(80, 340, 140, 90, 6);
-  if (st.toyOut) {
-    fill('#d0a030');
-    triangle(100, 340, 130, 300, 160, 340);
-    fill('#3050c0');
-    rect(170, 320, 30, 20, 3);
-  }
-  addHotspot(80, 340, 140, 90, () => {
-    st.toyOut = true;
-    showToast('Toys everywhere! A small mess, but fun.');
-  });
-
-  // closet with jacket
-  fill('#2f3a45');
-  rect(320, 240, 90, 190, 3);
-  fill('#20262e');
-  rect(326, 246, 78, 178);
-  if (!st.jacketTaken) {
-    fill(200, 90, 60);
-    rect(345, 280, 40, 60, 4);
-  }
-  addHotspot(320, 240, 90, 190, () => {
-    if (!st.jacketTaken) {
-      st.jacketTaken = true;
-      inventory.add('jacket');
-      showToast('You grab a warm jacket.');
-    } else {
-      showToast('Just empty hangers now.');
-    }
-  });
-
-  // light switch
-  fill(220);
-  rect(870, 300, 14, 20, 2);
-  addHotspot(860, 290, 40, 40, () => {
-    st.lightOn = !st.lightOn;
-    showToast(st.lightOn ? 'Lights on.' : 'Lights off.');
-  });
-
-  handleHotspots();
-}
-
-/* ---------- LIVING ROOM ---------- */
-
-function roomLiving() {
-  const st = roomState.living;
-  drawWallsFloor(color('#4a4438'), color('#5a4530'));
-  drawWindow(400, 60, 200, 120, '#2a2a55', '#8a7ab0');
-
-  // sofa
-  fill('#7a5a45');
-  rect(60, 320, 260, 110, 10);
-  fill(st.cushionFluffed ? color('#a88a6a') : color('#8a6a50'));
-  rect(75, 330, 100, 60, 8);
-  rect(190, 330, 100, 60, 8);
-  addHotspot(60, 320, 260, 110, () => {
-    st.cushionFluffed = !st.cushionFluffed;
-    showToast('You fluff the cushions.');
-  });
-
-  // TV
-  fill('#1a1a1a');
-  rect(650, 220, 200, 120, 4);
-  fill(st.tvOn ? color(120, 200, 255) : color(20, 20, 25));
-  rect(660, 230, 180, 100, 2);
-  fill('#3a3a3a');
-  rect(730, 340, 40, 10);
-  addHotspot(650, 220, 200, 120, () => {
-    st.tvOn = !st.tvOn;
-    showToast(st.tvOn ? 'You turn on the TV.' : 'You turn off the TV.');
-  });
-
-  // bowl by the door with keys
-  fill('#3a2a1f');
-  ellipse(400, 420, 70, 30);
-  if (!st.keysTaken) {
-    fill(230, 200, 90);
-    ellipse(390, 412, 14, 14);
-    ellipse(408, 410, 10, 10);
-  }
-  addHotspot(365, 395, 70, 50, () => {
-    if (!st.keysTaken) {
-      st.keysTaken = true;
-      inventory.add('keys');
-      showToast('You grab your keys from the bowl.');
-    } else {
-      showToast('The bowl is empty.');
-    }
-  });
-
-  // bookshelf (flavor)
-  fill('#3a2a1f');
-  rect(560, 280, 60, 160, 3);
-  for (let i = 0; i < 4; i++) {
-    fill(color(80 + i * 30, 60, 60));
-    rect(566, 290 + i * 35, 48, 10);
-  }
-  addHotspot(560, 280, 60, 160, () => showToast('Dusty old paperbacks.'));
-
-  handleHotspots();
-}
-
-/* ---------- KITCHEN ---------- */
-
-function roomKitchen() {
-  const st = roomState.kitchen;
-  drawWallsFloor(color('#4a5540'), color('#8a7a5a'));
-  drawWindow(60, 60, 160, 110, '#3a5a3a', '#a0c98a');
-
-  // counter
-  fill('#8a8a90');
-  rect(0, 320, DESIGN_W, 24);
-  fill('#5a5a60');
-  rect(0, 344, DESIGN_W, 120);
-
-  // kettle
-  fill('#c0c0c8');
-  ellipse(150, 300, 60, 40);
-  fill(st.kettleOn ? color(255, 120, 60) : color(120, 120, 130));
-  rect(140, 260, 20, 20, 3);
-  addHotspot(120, 260, 70, 70, () => {
-    st.kettleOn = !st.kettleOn;
-    showToast(st.kettleOn ? 'The kettle starts to hum.' : 'You switch off the kettle.');
-  });
-
-  // fridge
-  fill('#d8d8e0');
-  rect(650, 200, 140, 220, 6);
-  if (st.fridgeOpen) {
-    fill('#2a2a30');
-    rect(660, 210, 120, 200, 4);
-    fill('#e0a030');
-    rect(675, 260, 30, 40, 3);
-  }
-  addHotspot(650, 200, 140, 220, () => {
-    st.fridgeOpen = !st.fridgeOpen;
-    showToast(st.fridgeOpen ? 'You open the fridge. A little cold light.' : 'You close the fridge.');
-  });
-
-  // eating table with chairs
-  fill('#6b4a30');
-  rect(320, 380, 220, 90, 6);
-  fill('#4a3320');
-  rect(340, 460, 14, 40);
-  rect(490, 460, 14, 40);
-  fill('#3a2a1f');
-  rect(300, 420, 30, 50, 3);
-  rect(560, 420, 30, 50, 3);
-  addHotspot(320, 380, 220, 90, () => showToast('The table where you eat together.'));
-
-  // shoe mat by the back door with shoes
-  fill('#3a2a1f');
-  rect(850, 400, 90, 40, 4);
-  if (!st.shoesTaken) {
-    fill(180, 60, 60);
-    ellipse(875, 415, 26, 14);
-    fill(60, 90, 170);
-    ellipse(900, 418, 26, 14);
-  }
-  addHotspot(840, 385, 100, 70, () => {
-    if (!st.shoesTaken) {
-      st.shoesTaken = true;
-      inventory.add('shoes');
-      showToast('You grab a pair of shoes.');
-    } else {
-      showToast('The mat is empty now.');
-    }
-  });
-
-  handleHotspots();
-}
-
-/* ---------------- HOTSPOT SYSTEM ---------------- */
-
-let currentHotspots = [];
-
-function addHotspot(x, y, w, h, onTap) {
-  currentHotspots.push({ x, y, w, h, onTap });
-}
-
-function handleHotspots() {
-  const p = mouseDesign();
-  for (const hs of currentHotspots) {
-    if (pointInRect(p, hs.x, hs.y, hs.w, hs.h)) {
-      hoverHotspot = hs;
-      hotspotGlow(hs.x, hs.y, hs.w, hs.h, true);
-      break;
-    }
+function doUndo() {
+  const snap = undoStack.pop();
+  if (!snap) return;
+  actor.x = snap.actor.x; actor.y = snap.actor.y; actor.z = snap.actor.z; actor.facing = snap.actor.facing;
+  for (const s of snap.ents) {
+    const e = entities.find(en => en.id === s.id);
+    if (e) { e.x = s.x; e.y = s.y; e.z = s.z; }
   }
 }
 
-/* ---------------- CONFETTI ---------------- */
+/* touch: swipe to move, tap action button to interact, tap undo to undo */
+let touchStart = null;
 
-function spawnConfetti() {
-  particles = [];
-  for (let i = 0; i < 80; i++) {
-    particles.push({
-      x: random(DESIGN_W),
-      y: random(-200, 0),
-      vy: random(2, 5),
-      vx: random(-1, 1),
-      c: color(random(200, 255), random(150, 220), random(80, 180)),
-      s: random(4, 9)
-    });
-  }
+function mousePressed() { handlePress(mouseX, mouseY); }
+function touchStarted() {
+  if (touches.length > 0) { touchStart = { x: touches[0].x, y: touches[0].y }; handlePress(touches[0].x, touches[0].y); }
+  return false;
+}
+function touchEnded() {
+  if (!touchStart) return false;
+  const p = toDesign(mouseX, mouseY);
+  const start = toDesign(touchStart.x, touchStart.y);
+  const dx = p.x - start.x, dy = p.y - start.y;
+  touchStart = null;
+  if (state !== STATE.PLAY || transitioning) return false;
+  if (abs(dx) < 30 && abs(dy) < 30) return false; // treat as tap, handled in handlePress
+  if (abs(dx) > abs(dy)) tryStep(dx > 0 ? DIRS.right : DIRS.left, false);
+  else tryStep(dy > 0 ? DIRS.down : DIRS.up, false);
+  return false;
 }
 
-function updateParticles() {
-  for (const pt of particles) {
-    pt.y += pt.vy;
-    pt.x += pt.vx;
-    if (pt.y > DESIGN_H + 20) pt.y = -20;
-  }
-}
-
-function drawParticles() {
-  push();
-  for (const pt of particles) {
-    fill(pt.c);
-    rect(pt.x, pt.y, pt.s, pt.s * 0.6);
-  }
-  pop();
-}
-
-/* ---------------- MAIN INPUT ---------------- */
-
-function handleTapAt(px, py) {
+function handlePress(px, py) {
   const p = toDesign(px, py);
-
   if (state === STATE.INTRO) {
     if (introButton && pointInRect(p, introButton.x, introButton.y, introButton.w, introButton.h)) {
       state = STATE.PLAY;
-      currentRoom = 'corridor';
+      resetGame();
+      showToast('A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.');
     }
     return;
   }
-
-  if (state === STATE.WIN) {
-    if (winButton && pointInRect(p, winButton.x, winButton.y, winButton.w, winButton.h)) {
-      inventory.clear();
-      resetRoomState();
-      state = STATE.PLAY;
-      currentRoom = 'corridor';
-    }
+  if (state === STATE.WIN) return;
+  if (undoButton && pointInRect(p, undoButton.x, undoButton.y, undoButton.w, undoButton.h)) {
+    doUndo();
     return;
   }
-
-  if (state === STATE.PLAY) {
-    if (transitioning) return;
-    if (backButton && pointInRect(p, backButton.x, backButton.y, backButton.w, backButton.h)) {
-      goToRoom('corridor');
-      return;
-    }
-    for (const hs of currentHotspots) {
-      if (pointInRect(p, hs.x, hs.y, hs.w, hs.h)) {
-        hs.onTap();
-        return;
-      }
-    }
+  if (actionButton && pointInRect(p, actionButton.x, actionButton.y, actionButton.w, actionButton.h)) {
+    doInteract();
+    return;
   }
-}
-
-function resetRoomState() {
-  roomState.corridor.lightOn = true;
-  roomState.corridor.closetOpen = false;
-  roomState.parent.lampOn = false;
-  roomState.parent.drawerOpen = false;
-  roomState.parent.bedMade = true;
-  roomState.parent.walletTaken = false;
-  roomState.child.toyOut = false;
-  roomState.child.curtainsOpen = false;
-  roomState.child.jacketTaken = false;
-  roomState.child.lightOn = true;
-  roomState.living.tvOn = false;
-  roomState.living.cushionFluffed = false;
-  roomState.living.keysTaken = false;
-  roomState.kitchen.kettleOn = false;
-  roomState.kitchen.shoesTaken = false;
-  roomState.kitchen.fridgeOpen = false;
-}
-
-function mousePressed() {
-  handleTapAt(mouseX, mouseY);
-}
-
-function touchStarted() {
-  if (touches.length > 0) {
-    handleTapAt(touches[0].x, touches[0].y);
-  } else {
-    handleTapAt(mouseX, mouseY);
-  }
-  return false;
 }
