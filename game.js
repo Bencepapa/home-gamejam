@@ -164,7 +164,7 @@ function makeEntities() {
 }
 
 let entities = [];
-let actor = { x: 5, y: 5, z: 0, facing: { x: 0, y: -1 } };
+let actor = { x: 3, y: 5, z: 0, facing: { x: 0, y: -1 } };
 let undoStack = [];
 let watchFound = false;
 const WATCH_SPOT = { x: 1, y: 1 };
@@ -172,7 +172,7 @@ const WATCH_SPOT = { x: 1, y: 1 };
 function resetGame() {
   entities = makeEntities();
   era = 'present';
-  actor = { x: 5, y: 5, z: 0, facing: { x: 0, y: -1 } };
+  actor = { x: 3, y: 5, z: 0, facing: { x: 0, y: -1 } };
   undoStack = [];
   watchFound = false;
 }
@@ -364,7 +364,7 @@ function drawEntity(e) {
 }
 
 function drawActor() {
-  const p = iso(actor.x, actor.y, actor.z);
+  const p = iso(actor.x + 0.5, actor.y + 0.5, actor.z); // feet at the cell's center, not its corner
   const isBaby = era === 'past';
   const bodyH = isBaby ? 34 : 64;
   const bodyW = isBaby ? 26 : 34;
