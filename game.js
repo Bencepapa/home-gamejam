@@ -349,7 +349,8 @@ const ROOMS = {
     plateImg: 'plate', lightmapImg: 'lightmap',
     spritesJsonKey: '_room', // unprefixed, for backward compatibility
     makeEntities: makeBedroomEntities,
-    spawn: { x: 0, y: 4, facing: { x: 1, y: 0 } }
+    spawn: { x: 0, y: 4, facing: { x: 1, y: 0 } },
+    pastCharacter: 'kid2' // the baby
   },
   living: {
     // fallback axis vectors below, used only until tools/anchor_editor.html
@@ -360,7 +361,8 @@ const ROOMS = {
     plateImg: 'livingPlate', lightmapImg: null,
     spritesJsonKey: '_room_living',
     makeEntities: makeLivingEntities,
-    spawn: { x: 1, y: 4, facing: { x: 1, y: 0 } }
+    spawn: { x: 1, y: 4, facing: { x: 1, y: 0 } },
+    pastCharacter: 'kid10' // the preschooler
   }
 };
 let currentRoomId = 'bedroom';
@@ -782,16 +784,27 @@ const TOUCH_MS = 300; // how long the touch pose holds after an interaction (2/3
 let actorTouchT = 0;
 function triggerTouch() { actorTouchT = TOUCH_MS; }
 
+// per-character walk/shadow tuning -- keyed by the sprite prefix, not by
+// a single baby/adult split, since each room's past can use a different
+// kid (the bedroom's baby totters harder and casts a smaller shadow than
+// the living room's older preschooler, who in turn is smaller than the
+// adult)
+const CHAR_TRAITS = {
+  man30: { wobbleAmp: 1, shadowMult: 0.62, shadowMin: 42 },
+  kid2: { wobbleAmp: 3, shadowMult: 0.5, shadowMin: 26 },
+  kid10: { wobbleAmp: 2, shadowMult: 0.55, shadowMin: 32 }
+};
+
 function drawActor() {
   const p = iso(actor.x + 0.5, actor.y + 0.5, actor.z); // feet at the cell's center, not its corner
-  const isBaby = era === 'past';
+  const character = era === 'past' ? ROOMS[currentRoomId].pastCharacter : 'man30';
+  const traits = CHAR_TRAITS[character] || CHAR_TRAITS.man30;
 
   if (actorWalk.t < 1) actorWalk.t = min(1, actorWalk.t + deltaTime / WALK_MS);
   const wob = actorWalk.t < 1 ? sin(actorWalk.t * PI) : 0;
   if (actorTouchT > 0) actorTouchT = max(0, actorTouchT - deltaTime);
-  const wobbleAmp = isBaby ? 3 : 1; // the smaller kid totters harder than the adult
+  const wobbleAmp = traits.wobbleAmp;
 
-  const character = isBaby ? 'kid2' : 'man30';
   const pose = actorTouchT > 0 ? 'touch' : 'stand';
   const { dir, mirror } = facingToSpriteDir(actor.facing);
   const key = `${character}_${dir}_${pose}`;
@@ -805,8 +818,7 @@ function drawActor() {
   translate(p.x, p.y);
   noStroke();
   fill(0, 0, 0, 90);
-  const shadowMult = isBaby ? 0.5 : 0.62; // the adult casts a noticeably bigger shadow
-  const shadowW = max(isBaby ? 26 : 42, w * shadowMult); // floor so it's never invisible
+  const shadowW = max(traits.shadowMin, w * traits.shadowMult); // floor so it's never invisible
   ellipse(0, -2, shadowW, shadowW * 0.42); // ground shadow stays put, doesn't wobble
 
   rotate(radians(3.5) * wobbleAmp * actorStepParity * wob);
