@@ -220,11 +220,11 @@ A tárgy végül begurul egy bútor alá és elveszik → **gyereksírás** → 
 
 **A szál:** ugyanaz a három rendszer (dobozvizsgálat, kergetés, tolás) egyetlen tengelyre fűzve — a végén azért tolod el apa dobozait, hogy megtaláld, amit tőle vettél el, és sosem adtál vissza.
 
-### 9.2 Nappali (óvodás) · **információ + doboz-sokoban**
+### 9.2 Nappali (óvodás) · **információ**
 
 **Horgonyszín.** A könyvespolc — mindkét idősíkban megvan, megérintve vált a jelen és a múlt között, ahogy a bölcső a hálószobában.
 
-**Jelen.** A könyvespolc félig kiürült, a könyvek fele már bedobozolva — **ugyanazok a doboz-entitások/sprite-ok**, mint a hálószobában (1×1 és 2×1, `Nézd` mindegyiken egy-egy könyv leírását adja: szín, cím-töredék, állapot). Új szabály csak ebben a szobában: **doboz dobozra tolható** — ha a tolás célcellája már foglalt egy másik tolható dobozzal, a doboz arra csúszik (z+1), nem blokkol. Ez az egyszerűbb megoldás a kettő közül, amit felvetettél (dobozok egymásra tolása vs. egymáson áttolás) — a meglévő "két egymásra pakolt doboz nem tolható tovább, de rá lehet állni" szabály változatlan marad, csak a *létrehozás* módja új: eddig a stack eleve úgy állt ott, most a játékos maga rakja egymásra őket, hogy helyet csináljon.
+**Jelen.** A könyvespolc félig kiürült, a könyvek fele már bedobozolva — **ugyanazok a doboz-entitások/sprite-ok**, mint a hálószobában (1×1 és 2×1, `Nézd` mindegyiken egy-egy könyv leírását adja: szín, cím-töredék, állapot), **ugyanúgy csak eltolhatók az útból, egymásra tolás nélkül.** A felnőttnek nincs elérési problémája — az csak az óvodás baja volt (lásd a puffot lent) —, úgyhogy a dobozok itt is pont azt a szerepet töltik be, mint a hálószobában: akadály, amit el kell tolni, hogy hozzáférj valamihez, semmi extra motor-mechanika nem kell hozzájuk.
 
 **Átváltás.** A könyvespolcot megérintve visszahúz az emlék.
 
@@ -247,11 +247,10 @@ A tárgy végül begurul egy bútor alá és elveszik → **gyereksírás** → 
 **A szál:** a gyerek, miközben a szülei az ajtón túl veszekednek, egy boldog családi rajzot rejt el a könyvek közé — a felnőtt ezt találja meg a kiürülő házban, évekkel később.
 
 **Motor-kiegészítések ehhez a szobához** (újak a hálószobához képest):
-1. Doboz-egymásra-tolás (fent).
-2. Felvehető tárgy: egyetlen boolean flag + entitás eltüntetése, nincs általános inventory.
-3. Másztálható bútor (puff): a doboz z+1-es rááll-logika, külön push+climb entitásként.
-4. Ülő póz + automatikus felállás: a szereplőn egy `sitting` state, bútor-interakcióval be, bármilyen input ki.
-5. Háttér-dialógus csík: ismétlődő/ciklikus rövid szövegek az ajtó felől, a fő toast-rendszertől függetlenül, csak amíg `era === 'past'` ebben a szobában.
+1. Felvehető tárgy: egyetlen boolean flag + entitás eltüntetése, nincs általános inventory.
+2. Másztálható bútor (puff): a doboz z+1-es rááll-logika, külön push+climb entitásként.
+3. Ülő póz + automatikus felállás: a szereplőn egy `sitting` state, bútor-interakcióval be, bármilyen input ki.
+4. Háttér-dialógus csík: ismétlődő/ciklikus rövid szövegek az ajtó felől, a fő toast-rendszertől függetlenül, csak amíg `era === 'past'` ebben a szobában.
 
 ### 9.3 Gyerekszoba (iskolás) · **sorrend**
 
