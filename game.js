@@ -120,18 +120,22 @@ function makeEntities() {
       lookText: 'A nagy szekrény. Sosem értem fel a tetejét.'
     },
     {
+      // sits visually on the nightstand until it's knocked off (see
+      // onNightstandBump); pixelOffset nudges it relative to the
+      // nightstand's own anchor point since it shares its grid cell.
       id: 'watch', cells: [{ dx: 0, dy: 0 }],
-      x: 2, y: 2, z: 0, height: 0.2,
-      push: false, blocking: false, stackable: false,
-      interact: 'chase', era: 'past',
+      x: 3, y: 0, z: 0, height: 0.2,
+      push: false, blocking: false, stackable: false, fallen: false,
+      pixelOffset: { x: 100, y: -25 },
+      interact: null, era: 'past',
       img: 'watch'
     },
 
     // --- present-only: boxes filling the same footprint area ---
     {
-      id: 'box_bed_1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
+      id: 'box_bed_1', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }],
       x: 4, y: 1, z: 0, height: 1,
-      push: 'axis', axis: 'y', blocking: true, stackable: true,
+      push: 'axis', axis: 'x', blocking: true, stackable: true,
       interact: 'look', era: 'present',
       img: 'box1x2',
       lookText: 'Anya ruhái, gondosan összehajtva. Sose látta ezt még senki.'
@@ -164,15 +168,15 @@ function makeEntities() {
 }
 
 let entities = [];
-let actor = { x: 0, y: 5, z: 0, facing: { x: 0, y: -1 } };
+let actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
 let undoStack = [];
 let watchFound = false;
-const WATCH_SPOT = { x: 1, y: 1 };
+const WATCH_GOAL = { x: 0, y: 0 }; // under the wardrobe
 
 function resetGame() {
   entities = makeEntities();
   era = 'present';
-  actor = { x: 0, y: 5, z: 0, facing: { x: 0, y: -1 } };
+  actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
   undoStack = [];
   watchFound = false;
 }
@@ -336,11 +340,19 @@ function drawScene() {
   if (DEBUG_GRID) drawDebugGrid();
 }
 
+const BUMP_MS = 260; // decay time for the walk-into-it wobble
+
+function triggerBump(e, dir) {
+  e.bumpT = 1;
+  e.bumpDir = (dir && dir.x !== 0) ? Math.sign(dir.x) : 1;
+}
+
 function drawEntity(e) {
   // unsliced sprite: anchor at the near (screen-lowest) corner of the
   // frontmost cell in its footprint, not the footprint's center.
   const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
   const p = iso(e.x + front.dx + 1, e.y + front.dy + 1, e.z);
+  if (e.pixelOffset) { p.x += e.pixelOffset.x; p.y += e.pixelOffset.y; }
   const img = images[e.img];
   if (!img) return;
   const meta = metaFor(e.img);
@@ -349,9 +361,15 @@ function drawEntity(e) {
   const ax = meta.anchor.x;
   const ay = meta.anchor.y;
 
+  if (e.bumpT > 0) e.bumpT = max(0, e.bumpT - deltaTime / BUMP_MS);
+
   push();
   translate(p.x, p.y);
   if (e.mirror) scale(-1, 1);
+  if (e.bumpT > 0) {
+    const skew = sin(e.bumpT * PI) * 0.3 * (e.bumpDir || 1);
+    drawingContext.transform(1, 0, skew, 1, 0, 0);
+  }
   imageMode(CORNER);
   const highlight = e.interact && state === STATE.PLAY && isFacingEntity(e);
   if (highlight) {
@@ -366,8 +384,8 @@ function drawEntity(e) {
 function drawActor() {
   const p = iso(actor.x + 0.5, actor.y + 0.5, actor.z); // feet at the cell's center, not its corner
   const isBaby = era === 'past';
-  const bodyH = isBaby ? 34 : 64;
-  const bodyW = isBaby ? 26 : 34;
+  const bodyH = isBaby ? 34 : 160; // adult: 2.5x taller
+  const bodyW = isBaby ? 26 : 51;  // adult: 1.5x wider
   push();
   translate(p.x, p.y);
   noStroke();
@@ -514,8 +532,11 @@ function drawToast() {
 function mouseDesign() { return toDesign(mouseX, mouseY); }
 function pointInRect(p, x, y, w, h) { return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; }
 
+// +x on this grid points screen-left (see AXIS_X), so the physical
+// right/left keys are intentionally mapped to -x/+x -- up/down (the y
+// axis) already pointed the intuitive way and needed no swap.
 const DIRS = {
-  right: { x: 1, y: 0 }, left: { x: -1, y: 0 },
+  right: { x: -1, y: 0 }, left: { x: 1, y: 0 },
   down: { x: 0, y: 1 }, up: { x: 0, y: -1 }
 };
 
@@ -545,13 +566,21 @@ function tryStep(dir, pulling) {
     else if (standable(tx, ty, actor.z + 1)) { actor.x = tx; actor.y = ty; actor.z = actor.z + 1; }
     return;
   }
+
+  triggerBump(blocker, dir); // every object reacts to being walked into
+
+  if (blocker.id === 'nightstand') onNightstandBump();
+
+  if (blocker.id === 'watch' && blocker.fallen) {
+    tryPushWatch(blocker, dir, tx, ty);
+    return;
+  }
   if (canPush(blocker, dir)) {
     saveUndo();
-    for (const c of blocker.cells) {} // footprint moves as a whole
     blocker.x += dir.x; blocker.y += dir.y;
     actor.x = tx; actor.y = ty;
   }
-  // else: blocked, just faced it
+  // else: blocked, just faced it (and bumped it, above)
 }
 
 function canPush(e, dir) {
@@ -589,10 +618,7 @@ function doInteract() {
 
   if (e.id === 'crib' && era === 'present') {
     showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
-    startEraTransition('past');
-    setTimeout(() => {
-      actor.x = 3; actor.y = 5; actor.facing = { x: 0, y: -1 }; actor.z = 0;
-    }, 900);
+    startEraTransition('past'); // stay put -- this IS where you were standing
     return;
   }
   if (e.id === 'crib' && era === 'past') {
@@ -603,37 +629,71 @@ function doInteract() {
     showToast(e.lookText);
     return;
   }
-  if (e.interact === 'chase') {
-    chaseWatch(e);
-    return;
-  }
 }
 
-function chaseWatch(watch) {
-  const options = [
-    { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }
-  ].map(d => ({ x: watch.x + d.x, y: watch.y + d.y }))
-   .filter(p => inBounds(p.x, p.y) && standable(p.x, p.y, 0));
+/* ---------------- PAST PUZZLE: the pocket watch ---------------- */
 
-  watch.chaseSteps = (watch.chaseSteps || 0) + 1;
-  if (watch.chaseSteps >= 3 || options.length === 0) {
-    entities = entities.filter(e => e.id !== 'watch');
-    showToast('Az óra begurul a szekrény alá és eltűnik.');
+function onNightstandBump() {
+  const watch = entities.find(e => e.id === 'watch');
+  if (!watch || watch.fallen) return;
+  watch.fallen = true;
+  watch.x = 3; watch.y = 2; // rolls two cells down, next to the bed
+  watch.pixelOffset = null;
+  watch.blocking = true;
+  watch.push = 'any';
+  watch.pushDistance = 2;
+  showToast('Az óra lepottyan az éjjeliszekrényről, és odagurul az ágy mellé.');
+}
+
+function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
+  const midX = watch.x + dir.x, midY = watch.y + dir.y;
+  const finalX = watch.x + dir.x * 2, finalY = watch.y + dir.y * 2;
+  const reachedGoal = finalX === WATCH_GOAL.x && finalY === WATCH_GOAL.y;
+
+  if (!inBounds(finalX, finalY)) return; // hit the wall: silently refuse, like a normal box
+
+  const midBlocked = !!entityAt(midX, midY, watch.z, o => o.blocking && o !== watch);
+  const finalBlocked = !!entityAt(finalX, finalY, watch.z, o => o.blocking && o !== watch);
+
+  if (midBlocked || (finalBlocked && !reachedGoal)) {
+    breakWatch();
+    return;
+  }
+
+  watch.x = finalX; watch.y = finalY;
+  actor.x = actorTargetX; actor.y = actorTargetY;
+
+  if (reachedGoal) {
+    showToast('Az óra begördül a szekrény alá.');
     setTimeout(() => {
       showToast('A baba felsír.');
       setTimeout(() => {
         startEraTransition('present');
         setTimeout(() => {
-          actor.x = 4; actor.y = 3; actor.facing = { x: 0, y: -1 };
+          actor.x = 0; actor.y = 4; actor.facing = { x: 1, y: 0 };
           showToast('Csend van. Csak a szoba.');
         }, 900);
       }, 1400);
     }, 900);
-    return;
   }
-  const next = random(options);
-  watch.x = next.x; watch.y = next.y;
-  showToast('Az óra elgurul előled.');
+}
+
+function breakWatch() {
+  showToast('Nem így történt, hogy is volt?');
+  setTimeout(resetPastPuzzle, 900);
+}
+
+function resetPastPuzzle() {
+  const watch = entities.find(e => e.id === 'watch');
+  if (!watch) return;
+  watch.fallen = false;
+  watch.x = 3; watch.y = 0;
+  watch.pixelOffset = { x: 100, y: -25 };
+  watch.blocking = false;
+  watch.push = false;
+  watch.pushDistance = 1;
+  watch.bumpT = 0;
+  showToast('Az óra visszakerül az éjjeliszekrényre.');
 }
 
 function saveUndo() {
