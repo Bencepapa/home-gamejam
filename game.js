@@ -470,9 +470,10 @@ function drawEntity(e) {
       p.y -= 70 * e.dropT; // still airborne, eases down to the floor
     }
   }
-  const useDesat = era === 'present' && !isColorAnchor(e) && imagesDesat[e.img];
-  const img = useDesat ? imagesDesat[e.img] : images[e.img];
+  const img = images[e.img];
   if (!img) return;
+  const desatAmt = desaturationAmount(e); // 0 = full color, 1 = fully gray
+  const desatImg = imagesDesat[e.img];
   const meta = metaFor(e.img);
   const w = img.width * meta.scale;
   const h = img.height * meta.scale;
@@ -489,9 +490,23 @@ function drawEntity(e) {
     drawingContext.shadowColor = 'rgba(255,220,140,0.9)';
     drawingContext.shadowBlur = 20;
   }
-  image(img, -w * ax, -h * ay, w, h);
+  image(img, -w * ax, -h * ay, w, h); // color base, always
+  if (desatAmt > 0 && desatImg) {
+    tint(255, 255, 255, desatAmt * 255); // gray overlay blended on top (0.5 = "still newish")
+    image(desatImg, -w * ax, -h * ay, w, h);
+    noTint();
+  }
   if (highlight) drawingContext.shadowBlur = 0;
   pop();
+}
+
+// Boxes are new (moving-day cardboard), not aged like the rest of the
+// room, so they only partially desaturate. Everything else in the
+// desaturatable set goes fully gray, except the current color anchor.
+function desaturationAmount(e) {
+  if (era !== 'present' || isColorAnchor(e)) return 0;
+  if (e.img === 'box1x1' || e.img === 'box1x2') return 0.5;
+  return imagesDesat[e.img] ? 1 : 0;
 }
 
 const WALK_MS = 220; // one totter cycle per completed step
@@ -671,8 +686,9 @@ function drawWinOverlay() {
 
 /* ---------------- TOAST ---------------- */
 
+const TOAST_MULT = 3; // every toast stays up 3x as long as its base duration
 function showToast(text, dur) {
-  const d = dur || 3.2;
+  const d = (dur || 3.2) * TOAST_MULT;
   toast = { text, t: d, dur: d };
 }
 
@@ -793,6 +809,12 @@ function doInteract() {
   triggerTouch();
 
   if (e.id === 'crib_present') {
+    if (watchFound) {
+      // the memory's already been relived and resolved -- touching the
+      // crib again shouldn't keep re-opening the flashback
+      showToast('Már emlékszem.');
+      return;
+    }
     showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
     // the flashback opens with the baby climbing out of the wardrobe,
     // regardless of where the adult was standing in the present -- the
