@@ -82,12 +82,12 @@ function inBounds(x, y) {
 
 /* ---------------- ENTITY MODEL ----------------
    cells: footprint offsets from (x,y). push: false|'any'|'axis'.
-   era: 'past' | 'present' | 'both'. anchor: true => never desaturated.
+   era: 'past' | 'present' | 'both'. Which present-era entity stays in
+   color (the "active" one) is decided dynamically by isColorAnchor().
 ------------------------------------------------- */
 
 function makeEntities() {
   return [
-    // --- anchor object: same physical crib in both eras ---
     // grid mapping (per user's corrected ASCII floor plan): origin sits at
     // the top-right of the plan, +x grows LEFT (toward the window wall),
     // +y grows DOWN (toward the door wall) -- i.e. x = 5 - column, y = row.
@@ -96,18 +96,19 @@ function makeEntities() {
       // past puzzles must never share mutable state. Pushing the crib
       // around in the past (the baby's doing) must not move "the crib" in
       // the present, and vice versa, even though it's visually the same
-      // object. Both are still 'anchor' so neither desaturates.
+      // object. Whether crib_present desaturates is dynamic (see
+      // isColorAnchor) -- it's the "active color" signal until solved.
       id: 'crib_present', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 3, y: 2, z: 0, height: 1,
       push: 'any', blocking: true, stackable: false, // pushable here too -- just independent of crib_past
-      interact: 'use', era: 'present', anchor: true,
+      interact: 'use', era: 'present',
       img: 'crib'
     },
     {
       id: 'crib_past', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 3, y: 2, z: 0, height: 1,
       push: 'any', blocking: true, stackable: false, // the baby can shove it around the room
-      interact: 'use', era: 'past', anchor: true,
+      interact: 'use', era: 'past',
       img: 'crib'
     },
 
@@ -177,10 +178,10 @@ function makeEntities() {
     },
     {
       // the actual wardrobe, not boxes -- it stayed exactly where it stood
-      // in the past, just desaturated like the rest of the present (no
-      // anchor:true, so it DOES get the gray treatment). This is where the
-      // watch turns up, but only once the past puzzle has pushed it under
-      // there -- see watchFound and the 'wardrobe_present' interact below.
+      // in the past. Desaturates like everything else in the present UNTIL
+      // watchFound flips it to the active color (see isColorAnchor) -- it's
+      // where the watch turns up, once the past puzzle has pushed it under
+      // there. See the 'wardrobe_present' interact below.
       id: 'wardrobe_present', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 0, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
@@ -255,6 +256,7 @@ function setup() {
   }
   resetGame();
   buildDesaturatedPlate();
+  buildDesaturatedSprites();
 }
 
 function buildDesaturatedPlate() {
@@ -262,6 +264,30 @@ function buildDesaturatedPlate() {
   g.image(images.plate, 0, 0, g.width, g.height); // graphics buffers default to CORNER mode
   g.filter(GRAY);
   plateDesat = g;
+}
+
+// Present-day props (not the actor) desaturate by default, per DESIGN.md's
+// "active color" rule -- exactly one object stays in color at a time, and
+// that object IS the "go here next" signal. See isColorAnchor().
+const DESATURATABLE_SPRITES = ['crib', 'bed', 'wardrobe', 'nightstand', 'watch', 'box1x1', 'box1x2'];
+let imagesDesat = {};
+function buildDesaturatedSprites() {
+  for (const key of DESATURATABLE_SPRITES) {
+    const img = images[key];
+    if (!img) continue;
+    const g = createGraphics(img.width, img.height);
+    g.image(img, 0, 0, g.width, g.height);
+    g.filter(GRAY);
+    imagesDesat[key] = g;
+  }
+}
+
+// Exactly one entity is the "active color" at a time: the crib until the
+// past puzzle is solved, then the wardrobe (where the watch turns up).
+function isColorAnchor(e) {
+  if (e.id === 'crib_present') return !watchFound;
+  if (e.id === 'wardrobe_present') return watchFound;
+  return false;
 }
 
 function windowResized() {
@@ -444,7 +470,8 @@ function drawEntity(e) {
       p.y -= 70 * e.dropT; // still airborne, eases down to the floor
     }
   }
-  const img = images[e.img];
+  const useDesat = era === 'present' && !isColorAnchor(e) && imagesDesat[e.img];
+  const img = useDesat ? imagesDesat[e.img] : images[e.img];
   if (!img) return;
   const meta = metaFor(e.img);
   const w = img.width * meta.scale;
