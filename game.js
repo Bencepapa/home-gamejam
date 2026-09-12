@@ -340,7 +340,7 @@ function drawScene() {
   if (DEBUG_GRID) drawDebugGrid();
 }
 
-const BUMP_MS = 260; // decay time for the walk-into-it wobble
+const BUMP_MS = 130; // decay time for the walk-into-it wobble
 
 function triggerBump(e, dir) {
   e.bumpT = 1;
@@ -367,7 +367,8 @@ function drawEntity(e) {
   translate(p.x, p.y);
   if (e.mirror) scale(-1, 1);
   if (e.bumpT > 0) {
-    const skew = sin(e.bumpT * PI) * 0.3 * (e.bumpDir || 1);
+    const eraFactor = era === 'past' ? 0.6 : 1; // the baby bumps things more gently
+    const skew = sin(e.bumpT * PI) * 0.2 * eraFactor * (e.bumpDir || 1);
     drawingContext.transform(1, 0, skew, 1, 0, 0);
   }
   imageMode(CORNER);
@@ -650,7 +651,7 @@ function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
   const finalX = watch.x + dir.x * 2, finalY = watch.y + dir.y * 2;
   const reachedGoal = finalX === WATCH_GOAL.x && finalY === WATCH_GOAL.y;
 
-  if (!inBounds(finalX, finalY)) return; // hit the wall: silently refuse, like a normal box
+  if (!inBounds(finalX, finalY)) { breakWatch(); return; } // hit the wall
 
   const midBlocked = !!entityAt(midX, midY, watch.z, o => o.blocking && o !== watch);
   const finalBlocked = !!entityAt(finalX, finalY, watch.z, o => o.blocking && o !== watch);
