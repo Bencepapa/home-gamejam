@@ -92,8 +92,8 @@ function makeEntities() {
     // +y grows DOWN (toward the door wall) -- i.e. x = 5 - column, y = row.
     {
       id: 'crib', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
-      x: 5, y: 3, z: 0, height: 1,
-      push: false, blocking: true, stackable: false,
+      x: 3, y: 2, z: 0, height: 1,
+      push: 'any', blocking: true, stackable: false, // the baby can shove it around the room
       interact: 'use', era: 'both', anchor: true,
       img: 'crib'
     },
@@ -125,16 +125,18 @@ function makeEntities() {
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
       img: 'wardrobe',
-      lookText: 'A nagy szekrény. Sosem értem fel a tetejét.'
+      lookText: 'Ide bújok, ha anya mérges.'
     },
     {
       // sits visually on the nightstand until it's knocked off (see
-      // onNightstandBump); pixelOffset nudges it relative to the
-      // nightstand's own anchor point since it shares its grid cell.
+      // onNightstandBump). attachedTo/attachOffset render it relative to
+      // the TARGET entity's own anchor point (not its own grid cell), so
+      // it rides along with the nightstand and its own sprite anchor stays
+      // normal instead of needing to be hand-tuned into some huge fraction.
       id: 'watch', cells: [{ dx: 0, dy: 0 }],
       x: 3, y: 0, z: 0, height: 0.2,
       push: false, blocking: false, stackable: false, fallen: false,
-      pixelOffset: { x: -25, y: 100 },
+      attachedTo: 'nightstand', attachOffset: { x: 0, y: -100 },
       interact: null, era: 'past',
       img: 'watch'
     },
@@ -363,6 +365,7 @@ function drawScene() {
 }
 
 const BUMP_MS = 130; // decay time for the walk-into-it (stationary) wobble
+const DROP_MS = 200; // time spent visually falling before it starts rolling
 
 function triggerBump(e, dir) {
   e.bumpT = 1;
@@ -384,6 +387,15 @@ function startMoveAnim(e, fromX, fromY, dir) {
   e.animDir = (dir && dir.x !== 0) ? Math.sign(dir.x) : 1;
 }
 
+// Base screen anchor for an entity's OWN grid cell (front corner of its
+// footprint, plus its own pixelOffset if any) -- ignores attachedTo.
+function entityBasePoint(e) {
+  const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
+  const p = iso(e.x + front.dx + 1, e.y + front.dy + 1, e.z);
+  if (e.pixelOffset) { p.x += e.pixelOffset.x; p.y += e.pixelOffset.y; }
+  return p;
+}
+
 function drawEntity(e) {
   let rx = e.x, ry = e.y;
   let skew = 0;
@@ -402,11 +414,22 @@ function drawEntity(e) {
   }
   if (e.mirror) skew *= -1; // the mirror scale() below flips the shear too
 
-  // unsliced sprite: anchor at the near (screen-lowest) corner of the
-  // frontmost cell in its footprint, not the footprint's center.
-  const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
-  const p = iso(rx + front.dx + 1, ry + front.dy + 1, e.z);
-  if (e.pixelOffset) { p.x += e.pixelOffset.x; p.y += e.pixelOffset.y; }
+  let p;
+  if (e.attachedTo) {
+    const target = entities.find(t => t.id === e.attachedTo);
+    p = target ? entityBasePoint(target) : entityBasePoint(e);
+    if (target && e.attachOffset) { p.x += e.attachOffset.x; p.y += e.attachOffset.y; }
+  } else {
+    // unsliced sprite: anchor at the near (screen-lowest) corner of the
+    // frontmost cell in its footprint, not the footprint's center.
+    const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
+    p = iso(rx + front.dx + 1, ry + front.dy + 1, e.z);
+    if (e.pixelOffset) { p.x += e.pixelOffset.x; p.y += e.pixelOffset.y; }
+    if (e.dropT > 0) { // falling off something it was attached to
+      e.dropT = max(0, e.dropT - deltaTime / DROP_MS);
+      p.y -= 70 * e.dropT; // still airborne, eases down to the floor
+    }
+  }
   const img = images[e.img];
   if (!img) return;
   const meta = metaFor(e.img);
@@ -449,7 +472,7 @@ function facingToSpriteDir(facing) {
   return { dir: 'se', mirror: false };
 }
 
-const TOUCH_MS = 450; // how long the touch pose holds after an interaction
+const TOUCH_MS = 300; // how long the touch pose holds after an interaction (2/3 of the original 450)
 let actorTouchT = 0;
 function triggerTouch() { actorTouchT = TOUCH_MS; }
 
@@ -476,12 +499,21 @@ function drawActor() {
   translate(p.x, p.y);
   noStroke();
   fill(0, 0, 0, 90);
-  ellipse(0, -2, w * 0.4, w * 0.18); // ground shadow stays put, doesn't wobble
+  const shadowMult = isBaby ? 0.5 : 0.62; // the adult casts a noticeably bigger shadow
+  const shadowW = max(isBaby ? 26 : 42, w * shadowMult); // floor so it's never invisible
+  ellipse(0, -2, shadowW, shadowW * 0.42); // ground shadow stays put, doesn't wobble
 
   rotate(radians(3.5) * wobbleAmp * actorStepParity * wob);
   const stretchX = 1 + wob * 0.05 * wobbleAmp;
   const stretchY = 1 - wob * 0.05 * wobbleAmp;
   scale((mirror ? -1 : 1) * stretchX, stretchY); // mirror + walk stretch combined
+
+  if (pose === 'touch' && actorTouchT > 0) {
+    // leans forward into whatever it's touching, easing in and back out
+    const tProg = constrain(actorTouchT / TOUCH_MS, 0, 1);
+    const touchSkew = sin(tProg * PI) * 0.22 * (mirror ? -1 : 1);
+    drawingContext.transform(1, 0, touchSkew, 1, 0, 0);
+  }
 
   imageMode(CORNER);
   image(img, -w * meta.anchor.x, -h * meta.anchor.y, w, h);
@@ -713,7 +745,12 @@ function doInteract() {
 
   if (e.id === 'crib' && era === 'present') {
     showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
-    startEraTransition('past'); // stay put -- this IS where you were standing
+    startEraTransition('past');
+    // the flashback opens with the baby climbing out of the wardrobe,
+    // regardless of where the adult was standing in the present
+    setTimeout(() => {
+      actor.x = 1; actor.y = 0; actor.facing = { x: 1, y: 0 }; actor.z = 0;
+    }, 900);
     return;
   }
   if (e.id === 'crib' && era === 'past') {
@@ -732,12 +769,23 @@ function onNightstandBump() {
   const watch = entities.find(e => e.id === 'watch');
   if (!watch || watch.fallen) return;
   watch.fallen = true;
-  watch.x = 3; watch.y = 2; // rolls two cells down, next to the bed
-  watch.pixelOffset = null;
   watch.blocking = true;
   watch.push = 'any';
   watch.pushDistance = 2;
-  showToast('Az óra lepottyan az éjjeliszekrényről, és odagurul az ágy mellé.');
+
+  const nightstand = entities.find(e => e.id === 'nightstand');
+  watch.attachedTo = null; // detach -- render from its own grid cell from now on
+  watch.x = nightstand.x; watch.y = nightstand.y; // phase 1: drop straight down, still on the nightstand's cell
+  watch.dropT = 1;
+  showToast('Az óra lepottyan az éjjeliszekrényről...');
+
+  setTimeout(() => {
+    // phase 2: once it's landed, it rolls to where it comes to rest
+    const fromX = watch.x, fromY = watch.y;
+    watch.x = 3; watch.y = 1; // just below the nightstand, clear of the (moved) crib
+    startMoveAnim(watch, fromX, fromY);
+    showToast('...és odagurul a padlóra.');
+  }, DROP_MS);
 }
 
 function tryPushWatch(watch, dir, actorTargetX, actorTargetY) {
@@ -806,11 +854,12 @@ function resetPastPuzzle() {
   if (!watch) return;
   watch.fallen = false;
   watch.x = 3; watch.y = 0;
-  watch.pixelOffset = { x: -25, y: 100 };
+  watch.attachedTo = 'nightstand'; watch.attachOffset = { x: 0, y: -100 };
   watch.blocking = false;
   watch.push = false;
   watch.pushDistance = 1;
   watch.bumpT = 0;
+  watch.dropT = 0;
   watch.animT = undefined; // cancel any slide it was mid-way through
   showToast('Az óra visszakerül az éjjeliszekrényre.');
 }

@@ -47,8 +47,8 @@
   },
   "watch": {
     "anchor": {
-      "x": 0.457,
-      "y": 1.176
+      "x": 0.5,
+      "y": 0.9
     },
     "scale": 1
   },
@@ -66,12 +66,60 @@
     },
     "scale": 1
   },
-  "man30_ne_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "man30_ne_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "man30_se_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "man30_se_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "kid2_ne_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "kid2_ne_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "kid2_se_stand": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 },
-  "kid2_se_touch": { "anchor": { "x": 0.5, "y": 0.97 }, "scale": 1 }
+  "man30_ne_stand": {
+    "anchor": {
+      "x": 0.385,
+      "y": 0.828
+    },
+    "scale": 1
+  },
+  "man30_ne_touch": {
+    "anchor": {
+      "x": 0.315,
+      "y": 0.735
+    },
+    "scale": 1
+  },
+  "man30_se_stand": {
+    "anchor": {
+      "x": 0.554,
+      "y": 0.887
+    },
+    "scale": 1
+  },
+  "man30_se_touch": {
+    "anchor": {
+      "x": 0.325,
+      "y": 0.85
+    },
+    "scale": 1
+  },
+  "kid2_ne_stand": {
+    "anchor": {
+      "x": 0.369,
+      "y": 0.841
+    },
+    "scale": 1
+  },
+  "kid2_ne_touch": {
+    "anchor": {
+      "x": 0.275,
+      "y": 0.836
+    },
+    "scale": 1
+  },
+  "kid2_se_stand": {
+    "anchor": {
+      "x": 0.464,
+      "y": 0.866
+    },
+    "scale": 1
+  },
+  "kid2_se_touch": {
+    "anchor": {
+      "x": 0.372,
+      "y": 0.839
+    },
+    "scale": 1
+  }
 }
