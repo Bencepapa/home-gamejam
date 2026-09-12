@@ -28,6 +28,7 @@ let era = 'present'; // 'present' | 'past'
 let transitioning = false;
 let transitionT = 0;
 let pendingEra = null;
+let pendingAction = null;
 
 let toast = null;
 let stepBusy = false;
@@ -98,7 +99,7 @@ function makeEntities() {
       // object. Both are still 'anchor' so neither desaturates.
       id: 'crib_present', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }],
       x: 3, y: 2, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, // fixed -- it's just the thing you touch
+      push: 'any', blocking: true, stackable: false, // pushable here too -- just independent of crib_past
       interact: 'use', era: 'present', anchor: true,
       img: 'crib'
     },
@@ -594,18 +595,25 @@ let actionButton = null;
 
 /* ---------------- TRANSITION (era fade) ---------------- */
 
-function startEraTransition(nextEra) {
+// nextEra: pass null/undefined to fade without changing era (e.g. a
+// puzzle reset). action: runs exactly once, at the blackest point of the
+// fade (transitionT hits 1) -- same moment the era itself swaps, so
+// anything that needs to change while the scene is hidden (actor
+// position/facing, entity state) can go here instead of a setTimeout that
+// only approximately lines up with the fade and shows a visible glitch.
+function startEraTransition(nextEra, action) {
   transitioning = true;
   transitionT = 0;
-  pendingEra = nextEra;
+  pendingEra = nextEra || null;
+  pendingAction = action || null;
 }
 
 function updateTransition() {
   if (!transitioning) return;
   transitionT += 0.05;
-  if (transitionT >= 1 && pendingEra) {
-    era = pendingEra;
-    pendingEra = null;
+  if (transitionT >= 1) {
+    if (pendingEra) { era = pendingEra; pendingEra = null; }
+    if (pendingAction) { const fn = pendingAction; pendingAction = null; fn(); }
   }
   if (transitionT >= 2) {
     transitioning = false;
@@ -635,15 +643,16 @@ function drawWinOverlay() {
 
 /* ---------------- TOAST ---------------- */
 
-function showToast(text) {
-  toast = { text, t: 3.2 };
+function showToast(text, dur) {
+  const d = dur || 3.2;
+  toast = { text, t: d, dur: d };
 }
 
 function drawToast() {
   if (!toast) return;
   toast.t -= deltaTime * 0.001;
   if (toast.t <= 0) { toast = null; return; }
-  const alpha = constrain(toast.t / 3.2, 0, 1) * 255;
+  const alpha = constrain(toast.t / toast.dur, 0, 1) * 255;
   push();
   textAlign(CENTER, CENTER);
   textSize(19);
@@ -757,12 +766,14 @@ function doInteract() {
 
   if (e.id === 'crib_present') {
     showToast('Megérinted a bölcsőt. Az emlék visszahúz.');
-    startEraTransition('past');
     // the flashback opens with the baby climbing out of the wardrobe,
-    // regardless of where the adult was standing in the present
-    setTimeout(() => {
+    // regardless of where the adult was standing in the present -- the
+    // reposition happens as the transition's own action, exactly when the
+    // screen is black, so there's no visible "adult stands there a beat,
+    // then snaps to the kid's spot" glitch.
+    startEraTransition('past', () => {
       actor.x = 1; actor.y = 0; actor.facing = { x: 1, y: 0 }; actor.z = 0;
-    }, 900);
+    });
     return;
   }
   if (e.id === 'crib_past') {
@@ -792,15 +803,19 @@ function onNightstandBump() {
   showToast('Az óra lepottyan az éjjeliszekrényről...');
 
   setTimeout(() => {
-    // phase 2: once it's landed, it rolls to where it comes to rest -- (4,3)
-    // has the SAME depth key as the bed's front cell, so the stable sort
-    // (bed defined earlier in the entities array) always draws the watch
-    // after/on top of it; anywhere with a strictly lower depth risked
-    // being painted over by the bed's oversized sprite bounding box.
+    // phase 2: it rolls toward (3,3), next to the bed -- but that's also
+    // crib_past's default cell. If the player hasn't pushed the crib out
+    // of the way first, the watch rolls straight into it and breaks.
     const fromX = watch.x, fromY = watch.y;
-    watch.x = 4; watch.y = 3;
+    const blocked = !!entityAt(3, 3, watch.z, o => o.blocking && o !== watch);
+    watch.x = 3; watch.y = 3;
     startMoveAnim(watch, fromX, fromY);
-    showToast('...és odagurul az ágy mellé.');
+    if (blocked) {
+      showToast('...és nekigurul a bölcsőnek.');
+      setTimeout(() => { triggerBump(watch, { x: 0, y: 0 }); breakWatch(); }, 160);
+    } else {
+      showToast('...és odagurul az ágy mellé.');
+    }
   }, DROP_MS);
 }
 
@@ -851,18 +866,19 @@ function onWatchReachedGoal() {
   setTimeout(() => {
     showToast('A baba felsír.');
     setTimeout(() => {
-      startEraTransition('present');
-      setTimeout(() => {
+      startEraTransition('present', () => {
         actor.x = 0; actor.y = 4; actor.facing = { x: 1, y: 0 };
-        showToast('Csend van. Csak a szoba.');
-      }, 900);
+      });
+      setTimeout(() => showToast('Csend van. Csak a szoba.'), 900);
     }, 1400);
   }, 900);
 }
 
 function breakWatch() {
-  showToast('Nem így történt, hogy is volt?');
-  setTimeout(resetPastPuzzle, 900);
+  showToast('Nem így történt, hogy is volt?', 5); // held longer -- give it time to read
+  setTimeout(() => {
+    startEraTransition(null, resetPastPuzzle); // fade out, reset while hidden, fade back in
+  }, 1100);
 }
 
 function resetPastPuzzle() {
