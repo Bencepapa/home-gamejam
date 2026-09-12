@@ -36,7 +36,7 @@ const STEP_MS = 160;
 
 let images = {};
 let spriteMeta = {}; // assets/sprites.json -- per-sprite anchor point + scale
-let plateDesat = null; // cached desaturated plate for present era
+let plateDesat = {}; // cached desaturated plates for present era, keyed by plateImg key
 
 const DEFAULT_SPRITE_META = { anchor: { x: 0.5, y: 0.9 }, scale: 1 };
 
@@ -135,6 +135,7 @@ function setLang(l) {
 function preload() {
   images.plate = loadImage('assets/room/halo.png');
   images.lightmap = loadImage('assets/room/halo_lightmap.png');
+  images.livingPlate = loadImage('assets/room/nappali.png');
   images.crib = loadImage('assets/sprites/bolcso.png');
   images.bed = loadImage('assets/sprites/agy.png');
   images.wardrobe = loadImage('assets/sprites/szekreny.png');
@@ -345,16 +346,18 @@ const ROOMS = {
     gridN: 6, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
     originPx: { x: 720, y: 395 },
     plateImg: 'plate', lightmapImg: 'lightmap',
+    spritesJsonKey: '_room', // unprefixed, for backward compatibility
     makeEntities: makeBedroomEntities,
     spawn: { x: 0, y: 4, facing: { x: 1, y: 0 } }
   },
   living: {
-    // no measured plate yet -- reuses the bedroom's axis vectors as a
-    // placeholder until the real living-room plate is generated and
-    // measured via tools/anchor_editor.html
+    // fallback axis vectors below, used only until tools/anchor_editor.html
+    // has measured the real plate and written a '_room_living' block to
+    // sprites.json (see applyRoomConfig)
     gridN: 7, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
     originPx: { x: 720, y: 395 },
-    plateImg: null, lightmapImg: null,
+    plateImg: 'livingPlate', lightmapImg: null,
+    spritesJsonKey: '_room_living',
     makeEntities: makeLivingEntities,
     spawn: { x: 1, y: 4, facing: { x: 1, y: 0 } }
   }
@@ -367,21 +370,22 @@ function applyRoomConfig(roomId) {
   AXIS_X = cfg.axisX;
   AXIS_Y = cfg.axisY;
   ORIGIN = cfg.originPx;
-  if (roomId === 'bedroom') {
-    // bedroom keeps its real, measured calibration from sprites.json,
-    // overriding the fallback values above when present
-    const room = spriteMeta._room;
-    if (room) {
-      if (room.originPx) ORIGIN = room.originPx;
-      if (room.gridN) GRID_N = room.gridN;
-      if (room.axisX && room.axisY) {
-        AXIS_X = room.axisX;
-        AXIS_Y = room.axisY;
-      } else if (room.tileW) {
-        const tw = room.tileW, th = room.tileH || room.tileW / 2;
-        AXIS_X = { x: tw / 2, y: th / 2 };
-        AXIS_Y = { x: -tw / 2, y: th / 2 };
-      }
+  // real, measured calibration from sprites.json (written by
+  // tools/anchor_editor.html) overrides the fallback values above, once
+  // it exists -- each room's block lives under its own key there
+  // ('_room' for the bedroom, kept unprefixed for backward compatibility;
+  // '_room_<id>' for every other room)
+  const room = spriteMeta[cfg.spritesJsonKey];
+  if (room) {
+    if (room.originPx) ORIGIN = room.originPx;
+    if (room.gridN) GRID_N = room.gridN;
+    if (room.axisX && room.axisY) {
+      AXIS_X = room.axisX;
+      AXIS_Y = room.axisY;
+    } else if (room.tileW) {
+      const tw = room.tileW, th = room.tileH || room.tileW / 2;
+      AXIS_X = { x: tw / 2, y: th / 2 };
+      AXIS_Y = { x: -tw / 2, y: th / 2 };
     }
   }
 }
@@ -448,10 +452,15 @@ function setup() {
 }
 
 function buildDesaturatedPlate() {
-  const g = createGraphics(images.plate.width, images.plate.height);
-  g.image(images.plate, 0, 0, g.width, g.height); // graphics buffers default to CORNER mode
-  g.filter(GRAY);
-  plateDesat = g;
+  for (const roomId in ROOMS) {
+    const key = ROOMS[roomId].plateImg;
+    const img = key && images[key];
+    if (!img || plateDesat[key]) continue;
+    const g = createGraphics(img.width, img.height);
+    g.image(img, 0, 0, g.width, g.height); // graphics buffers default to CORNER mode
+    g.filter(GRAY);
+    plateDesat[key] = g;
+  }
 }
 
 // Present-day props (not the actor) desaturate by default, per DESIGN.md's
@@ -587,7 +596,7 @@ function lightmapAlpha() {
 function drawScene() {
   const room = ROOMS[currentRoomId];
   const rawPlate = room.plateImg ? images[room.plateImg] : null;
-  const plateImg = (era === 'present' && rawPlate === images.plate) ? plateDesat : rawPlate;
+  const plateImg = (era === 'present' && plateDesat[room.plateImg]) ? plateDesat[room.plateImg] : rawPlate;
   if (plateImg) {
     imageMode(CENTER);
     image(plateImg, DESIGN_W / 2, DESIGN_H / 2);

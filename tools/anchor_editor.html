@@ -72,6 +72,8 @@
       <label>TW <input type="number" id="gridTW" step="0.1"></label>
       <label>TH <input type="number" id="gridTH" step="0.1"></label>
       <span style="width:1px; height:18px; background:#444;"></span>
+      <label>Aktív szoba (rács-ref.) <select id="activeRoom"></select></label>
+      <span style="width:1px; height:18px; background:#444;"></span>
       <button class="cal" id="calBtn" onclick="toggleCalibration()">3-pontos kalibráció (csak szobánál)</button>
       <span id="calHint"></span>
     </div>
@@ -120,7 +122,12 @@ const SPRITE_FILES = {
   kid2_se_stand: '../assets/sprites/kid2_se_stand.png',
   kid2_se_touch: '../assets/sprites/kid2_se_touch.png'
 };
-const ROOM_FILES = { room: '../assets/room/halo.png' };
+const ROOM_FILES = { room: '../assets/room/halo.png', living: '../assets/room/nappali.png' };
+const ROOM_LABELS = { room: 'Hálószoba', living: 'Nappali' };
+// JSON key each room's calibration lives under -- 'room' keeps the
+// original unprefixed '_room' for backward compatibility with existing
+// sprites.json files, every other room gets its own '_room_<key>' block.
+function roomJsonKey(k) { return k === 'room' ? '_room' : '_room_' + k; }
 
 const DEFAULT_ROOM = {
   originPx: { x: 0, y: 0 }, gridN: 6,
@@ -131,6 +138,17 @@ const DEFAULT_ROOM = {
 let data = { _comment: 'edited with tools/anchor_editor.html' };
 for (const k of SPRITES) data[k] = { anchor: {x:0.5, y:0.9}, scale: 1 };
 data._room = JSON.parse(JSON.stringify(DEFAULT_ROOM));
+
+// which room's grid the CURRENT view uses as its reference -- for a room
+// plate this always matches the plate being viewed (kept in sync by
+// select()); for a sprite it's independently choosable, so a new room's
+// furniture can be previewed against ITS grid pitch, not the bedroom's.
+let activeRoomKey = 'room';
+function ensureRoomData(key) {
+  const jk = roomJsonKey(key);
+  if (!data[jk]) data[jk] = JSON.parse(JSON.stringify(DEFAULT_ROOM));
+  return data[jk];
+}
 
 let current = null; // {key, isRoom, path}
 let naturalW = 0, naturalH = 0;
@@ -158,10 +176,21 @@ function buildLists() {
   for (const k in ROOM_FILES) {
     const d = document.createElement('div');
     d.className = 'item'; d.dataset.key = k;
-    d.innerHTML = `<img src="${ROOM_FILES[k]}"><span>${k} (origó)</span>`;
+    d.innerHTML = `<img src="${ROOM_FILES[k]}"><span>${ROOM_LABELS[k] || k} (origó)</span>`;
     d.onclick = () => select(k, true, ROOM_FILES[k]);
     rl.appendChild(d);
   }
+}
+
+function buildActiveRoomSelect() {
+  const sel = el('activeRoom');
+  sel.innerHTML = '';
+  for (const k in ROOM_FILES) {
+    const opt = document.createElement('option');
+    opt.value = k; opt.textContent = ROOM_LABELS[k] || k;
+    sel.appendChild(opt);
+  }
+  sel.value = activeRoomKey;
 }
 
 function loadCustom() {
@@ -175,6 +204,7 @@ function loadCustom() {
 function select(key, isRoom, path) {
   current = { key, isRoom, path };
   stopCalibration();
+  if (isRoom) { activeRoomKey = key; el('activeRoom').value = key; }
   document.querySelectorAll('.item').forEach(i => i.classList.toggle('active', i.dataset.key === key));
   el('currentName').textContent = key + (isRoom ? ' (szoba)' : '');
   const img = el('img');
@@ -194,12 +224,13 @@ function select(key, isRoom, path) {
 
 function refreshFields() {
   if (!current) return;
-  el('gridN').value = current.isRoom ? (data._room.gridN || 6) : spritePreviewN;
+  const rd = ensureRoomData(activeRoomKey);
+  el('gridN').value = current.isRoom ? (rd.gridN || 6) : spritePreviewN;
   el('gridNLabel').textContent = current.isRoom ? 'N (rács méret)' : 'N (előnézet cellák)';
-  el('gridTW').value = (data._room.tileW || 200).toFixed ? data._room.tileW.toFixed(2) : data._room.tileW;
-  el('gridTH').value = (data._room.tileH || 100).toFixed ? data._room.tileH.toFixed(2) : data._room.tileH;
+  el('gridTW').value = (rd.tileW || 200).toFixed ? rd.tileW.toFixed(2) : rd.tileW;
+  el('gridTH').value = (rd.tileH || 100).toFixed ? rd.tileH.toFixed(2) : rd.tileH;
   if (current.isRoom) {
-    const r = data._room.originPx;
+    const r = rd.originPx;
     el('status').textContent = `origó px: (${r.x.toFixed(1)}, ${r.y.toFixed(1)})`;
   } else {
     const s = data[current.key];
@@ -218,7 +249,7 @@ function layoutMarker() {
   const zoom = parseFloat(el('zoom').value);
   el('stage').style.transform = `scale(${zoom})`;
   if (current.isRoom) {
-    const r = data._room.originPx;
+    const r = ensureRoomData(activeRoomKey).originPx;
     m.style.left = r.x + 'px';
     m.style.top = r.y + 'px';
   } else {
@@ -229,7 +260,7 @@ function layoutMarker() {
 }
 
 function currentAxes() {
-  const r = data._room;
+  const r = ensureRoomData(activeRoomKey);
   if (r.axisX && r.axisY) return { axisX: r.axisX, axisY: r.axisY };
   const tw = parseFloat(el('gridTW').value) || 200, th = parseFloat(el('gridTH').value) || tw/2;
   return { axisX: { x: tw/2, y: th/2 }, axisY: { x: -tw/2, y: th/2 } };
@@ -247,7 +278,7 @@ function drawGridOverlay() {
 
   if (current.isRoom) {
     const N = parseInt(el('gridN').value) || 6;
-    const origin = data._room.originPx;
+    const origin = ensureRoomData(activeRoomKey).originPx;
     function isoPt(x,y){ return [origin.x + x*axisX.x + y*axisY.x, origin.y + x*axisX.y + y*axisY.y]; }
     ctx.strokeStyle = 'rgba(0,255,255,0.8)';
     ctx.lineWidth = 1;
@@ -311,7 +342,7 @@ function eventToImagePoint(e) {
 function setPoint(x, y) {
   if (!current) return;
   if (current.isRoom) {
-    data._room.originPx = { x: Math.round(x*10)/10, y: Math.round(y*10)/10 };
+    ensureRoomData(activeRoomKey).originPx = { x: Math.round(x*10)/10, y: Math.round(y*10)/10 };
   } else {
     // deliberately NOT clamped to [0,1]: a tightly-cropped sprite's true
     // ground-contact point can fall outside its own pixel bounds.
@@ -330,26 +361,33 @@ el('zoom').addEventListener('input', () => { layoutMarker(); });
 el('showGrid').addEventListener('change', drawGridOverlay);
 el('gridN').addEventListener('input', () => {
   const n = parseInt(el('gridN').value) || (current && current.isRoom ? 6 : 2);
-  if (current && current.isRoom) { data._room.gridN = n; updateJsonPreview(); }
-  else { spritePreviewN = n; } // never touches data._room -- preview only
+  if (current && current.isRoom) { ensureRoomData(activeRoomKey).gridN = n; updateJsonPreview(); }
+  else { spritePreviewN = n; } // never touches room data -- preview only
+  drawGridOverlay();
+});
+el('activeRoom').addEventListener('change', () => {
+  activeRoomKey = el('activeRoom').value;
+  refreshFields();
   drawGridOverlay();
 });
 el('gridTW').addEventListener('input', () => {
   const tw = parseFloat(el('gridTW').value)||0;
-  data._room.tileW = tw;
+  const rd = ensureRoomData(activeRoomKey);
+  rd.tileW = tw;
   // manual TW/TH edits always produce a symmetric diamond, overwriting any
   // previously-calibrated (possibly asymmetric) axisX/axisY
   const th = parseFloat(el('gridTH').value) || tw/2;
-  data._room.axisX = { x: tw/2, y: th/2 };
-  data._room.axisY = { x: -tw/2, y: th/2 };
+  rd.axisX = { x: tw/2, y: th/2 };
+  rd.axisY = { x: -tw/2, y: th/2 };
   drawGridOverlay(); updateJsonPreview();
 });
 el('gridTH').addEventListener('input', () => {
   const th = parseFloat(el('gridTH').value)||0;
-  data._room.tileH = th;
+  const rd = ensureRoomData(activeRoomKey);
+  rd.tileH = th;
   const tw = parseFloat(el('gridTW').value) || th*2;
-  data._room.axisX = { x: tw/2, y: th/2 };
-  data._room.axisY = { x: -tw/2, y: th/2 };
+  rd.axisX = { x: tw/2, y: th/2 };
+  rd.axisY = { x: -tw/2, y: th/2 };
   drawGridOverlay(); updateJsonPreview();
 });
 
@@ -390,11 +428,12 @@ function handleCalibrationClick(e) {
   } else if (calPoints.length === 3) {
     const N = parseInt(el('gridN').value) || 6;
     const [o, xEnd, yEnd] = calPoints;
-    data._room.originPx = { x: Math.round(o.x*10)/10, y: Math.round(o.y*10)/10 };
-    data._room.axisX = { x: Math.round((xEnd.x-o.x)/N*1000)/1000, y: Math.round((xEnd.y-o.y)/N*1000)/1000 };
-    data._room.axisY = { x: Math.round((yEnd.x-o.x)/N*1000)/1000, y: Math.round((yEnd.y-o.y)/N*1000)/1000 };
-    data._room.tileW = Math.round(Math.abs(data._room.axisX.x - data._room.axisY.x)*100)/100;
-    data._room.tileH = Math.round((data._room.axisX.y + data._room.axisY.y)*100)/100;
+    const rd = ensureRoomData(activeRoomKey);
+    rd.originPx = { x: Math.round(o.x*10)/10, y: Math.round(o.y*10)/10 };
+    rd.axisX = { x: Math.round((xEnd.x-o.x)/N*1000)/1000, y: Math.round((xEnd.y-o.y)/N*1000)/1000 };
+    rd.axisY = { x: Math.round((yEnd.x-o.x)/N*1000)/1000, y: Math.round((yEnd.y-o.y)/N*1000)/1000 };
+    rd.tileW = Math.round(Math.abs(rd.axisX.x - rd.axisY.x)*100)/100;
+    rd.tileH = Math.round((rd.axisX.y + rd.axisY.y)*100)/100;
     el('calHint').textContent = 'kész — axisX/axisY frissítve.';
     stopCalibration();
     layoutMarker();
@@ -410,13 +449,15 @@ function updateJsonPreview() {
 function applyLoadedJson(j) {
   data = Object.assign({ _room: JSON.parse(JSON.stringify(DEFAULT_ROOM)) }, j);
   for (const k of SPRITES) if (!data[k]) data[k] = { anchor:{x:0.5,y:0.9}, scale:1 };
-  if (!data._room) data._room = JSON.parse(JSON.stringify(DEFAULT_ROOM));
-  if (!data._room.gridN) data._room.gridN = 6;
-  if (!data._room.tileW) data._room.tileW = 200;
-  if (!data._room.axisX || !data._room.axisY) {
-    const tw = data._room.tileW, th = data._room.tileH || tw/2;
-    data._room.axisX = { x: tw/2, y: th/2 };
-    data._room.axisY = { x: -tw/2, y: th/2 };
+  for (const rk in ROOM_FILES) {
+    const rd = ensureRoomData(rk);
+    if (!rd.gridN) rd.gridN = 6;
+    if (!rd.tileW) rd.tileW = 200;
+    if (!rd.axisX || !rd.axisY) {
+      const tw = rd.tileW, th = rd.tileH || tw/2;
+      rd.axisX = { x: tw/2, y: th/2 };
+      rd.axisY = { x: -tw/2, y: th/2 };
+    }
   }
   if (current) refreshFields();
   layoutMarker();
@@ -464,6 +505,7 @@ function downloadJson() {
 }
 
 buildLists();
+buildActiveRoomSelect();
 updateJsonPreview();
 select('crib', false, SPRITE_FILES.crib);
 loadExisting();
