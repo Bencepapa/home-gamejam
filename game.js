@@ -143,9 +143,10 @@ function preload() {
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
   images.box1x2 = loadImage('assets/sprites/doboz_1x2.png');
-  for (const ch of ['man30', 'kid2']) {
+  const CHAR_POSES = { man30: ['stand', 'touch'], kid2: ['stand', 'touch'], kid10: ['stand', 'touch', 'sit'] };
+  for (const ch in CHAR_POSES) {
     for (const dir of ['ne', 'se']) {
-      for (const pose of ['stand', 'touch']) {
+      for (const pose of CHAR_POSES[ch]) {
         const key = `${ch}_${dir}_${pose}`;
         images[key] = loadImage(`assets/sprites/${key}.png`);
       }
