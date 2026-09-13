@@ -139,6 +139,9 @@ function preload() {
   images.crib = loadImage('assets/sprites/bolcso.png');
   images.bed = loadImage('assets/sprites/agy.png');
   images.wardrobe = loadImage('assets/sprites/szekreny.png');
+  images.wardrobeEmpty = loadImage('assets/sprites/szekreny_ures.png');
+  images.shelf1 = loadImage('assets/sprites/konyvszekr1.png');
+  images.shelf2 = loadImage('assets/sprites/konyvszekr2.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
@@ -278,7 +281,7 @@ function makeBedroomEntities() {
       x: 0, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'present',
-      img: 'wardrobe'
+      img: 'wardrobeEmpty' // emptied out for the move, not just a grayed copy of the full one
     }
   ];
 }
@@ -312,9 +315,9 @@ function makeLivingEntities() {
     // bookshelves, unchanged between eras for now (era: 'both') -- which
     // one is "empty" vs "still full" is pending the real puzzle logic
     { id: 'shelf1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 0, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'shelf1' },
     { id: 'shelf2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 2, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'shelf2' },
 
     // L-shaped couch (two pieces), coffee table in front of it, decor
     { id: 'couch1', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 4, z: 0, height: 1,
@@ -470,7 +473,7 @@ function buildDesaturatedPlate() {
 // Present-day props (not the actor) desaturate by default, per DESIGN.md's
 // "active color" rule -- exactly one object stays in color at a time, and
 // that object IS the "go here next" signal. See isColorAnchor().
-const DESATURATABLE_SPRITES = ['crib', 'bed', 'wardrobe', 'nightstand', 'watch', 'box1x1', 'box1x2'];
+const DESATURATABLE_SPRITES = ['crib', 'bed', 'wardrobe', 'wardrobeEmpty', 'nightstand', 'watch', 'box1x1', 'box1x2', 'shelf1', 'shelf2'];
 let imagesDesat = {};
 function buildDesaturatedSprites() {
   for (const key of DESATURATABLE_SPRITES) {
