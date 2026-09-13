@@ -146,6 +146,12 @@ function preload() {
   images.wardrobeEmpty = loadImage('assets/sprites/szekreny_ures.png');
   images.shelf1 = loadImage('assets/sprites/konyvszekr1.png');
   images.shelf2 = loadImage('assets/sprites/konyvszekr2.png');
+  images.tvOn = loadImage('assets/sprites/TV_on.png');
+  images.tvOff = loadImage('assets/sprites/TV_off.png');
+  images.couch = loadImage('assets/sprites/kanape.png');
+  images.puff = loadImage('assets/sprites/puff.png');
+  images.coffeeTable = loadImage('assets/sprites/dohanyzoasztal.png');
+  images.plant = loadImage('assets/sprites/padlovirag.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
@@ -305,14 +311,14 @@ function makeLivingEntities() {
       x: 3, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'use', era: 'present',
-      img: 'box1x1'
+      img: 'tvOff'
     },
     {
       id: 'tv_past', cells: [{ dx: 0, dy: 0 }],
       x: 3, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
-      img: 'box1x1',
+      img: 'tvOn',
       lookKey: 'lookTV'
     },
 
@@ -323,19 +329,19 @@ function makeLivingEntities() {
     { id: 'shelf2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 2, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'shelf2' },
 
-    // L-shaped couch (two pieces), coffee table in front of it, decor
-    { id: 'couch1', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 4, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
-    { id: 'couch2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 5, y: 3, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+    // couch (single 2-seat sofa sprite, not the two-piece L from the
+    // original placeholder plan -- swap/add a second piece later if an
+    // actual corner sofa sprite shows up), coffee table in front, decor
+    { id: 'couch', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 4, z: 0, height: 1,
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'couch' },
     { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 2, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x2' },
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'coffeeTable' },
     { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 6, y: 1, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'box1x1' },
+      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'plant' },
 
     // the pouf the kid pushes to the shelf and climbs -- past only for now
     { id: 'puff', cells: [{ dx: 0, dy: 0 }], x: 1, y: 3, z: 0, height: 1,
-      push: 'any', blocking: true, stackable: true, interact: null, era: 'past', img: 'box1x1' },
+      push: 'any', blocking: true, stackable: true, interact: null, era: 'past', img: 'puff' },
 
     // present-only clutter blocking the path to the TV
     { id: 'box_living_1', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 1,
@@ -522,7 +528,7 @@ function buildDesaturatedPlate() {
 // Present-day props (not the actor) desaturate by default, per DESIGN.md's
 // "active color" rule -- exactly one object stays in color at a time, and
 // that object IS the "go here next" signal. See isColorAnchor().
-const DESATURATABLE_SPRITES = ['crib', 'bed', 'wardrobe', 'wardrobeEmpty', 'nightstand', 'watch', 'box1x1', 'box1x2', 'shelf1', 'shelf2'];
+const DESATURATABLE_SPRITES = ['crib', 'bed', 'wardrobe', 'wardrobeEmpty', 'nightstand', 'watch', 'box1x1', 'box1x2', 'shelf1', 'shelf2', 'tvOff', 'couch', 'coffeeTable', 'plant'];
 let imagesDesat = {};
 function buildDesaturatedSprites() {
   for (const key of DESATURATABLE_SPRITES) {
