@@ -349,10 +349,15 @@ function makeLivingEntities() {
 
 // ---- corridor (folyosó) -- the hub. 7 wide x 3 deep, all 4 room doors
 // along the y=0 wall (only two rooms exist so far -- the other two door
-// slots aren't placed until gyerekszoba/ebédlő exist). Placeholder boxes
-// stand in for the coat rack and doors until there's real art; door
-// entities just call switchRoom() directly rather than a real transition,
-// since there's no per-room "return to corridor" doorway wired up yet.
+// slots aren't placed until gyerekszoba/ebédlő exist). Placeholder box
+// stands in for the coat rack until there's real art; doors have no
+// sprite at all yet -- they're drawn procedurally as a plain doorframe
+// (see drawDoorway) since they're wall openings, not furniture, and a
+// cardboard box read as the wrong kind of object. Walking into a door
+// OR interacting with it both work (see tryStep/doInteract's `doorTo`
+// checks) -- it doesn't call a real transition (fade), it just calls
+// switchRoom() directly, since there's no per-room "return to corridor"
+// doorway wired up yet either.
 function makeCorridorEntities() {
   return [
     { id: 'coatrack', cells: [{ dx: 0, dy: 0 }], x: 3, y: 2, z: 0, height: 1,
@@ -360,10 +365,10 @@ function makeCorridorEntities() {
       interact: 'look', era: 'both', img: 'box1x1', lookKey: 'lookCoatrack' },
     { id: 'door_bedroom', cells: [{ dx: 0, dy: 0 }], x: 1, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
-      interact: 'use', era: 'both', img: 'box1x1' },
+      interact: 'use', era: 'both', doorTo: 'bedroom' },
     { id: 'door_living', cells: [{ dx: 0, dy: 0 }], x: 5, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
-      interact: 'use', era: 'both', img: 'box1x1' }
+      interact: 'use', era: 'both', doorTo: 'living' }
   ];
 }
 
@@ -759,7 +764,10 @@ function drawEntity(e) {
     }
   }
   const img = images[e.img];
-  if (!img) return;
+  if (!img) {
+    if (e.doorTo) drawDoorway(e, p); // no real door art yet -- see drawDoorway
+    return;
+  }
   const desatAmt = desaturationAmount(e); // 0 = full color, 1 = fully gray
   const desatImg = imagesDesat[e.img];
   const meta = metaFor(e.img);
@@ -796,6 +804,29 @@ function drawEntity(e) {
     image(desatImg, -w * ax, -h * ay, w, h);
   }
   noTint();
+  if (highlight) drawingContext.shadowBlur = 0;
+  pop();
+}
+
+// A plain doorframe with a dark opening -- a placeholder for doors that
+// don't have real art yet. It's a wall segment, not furniture, so a
+// cardboard-box sprite would read as the wrong kind of object; once a
+// real door sprite exists, giving the entity an `img` key makes it use
+// the normal sprite path instead (see the `if (!img)` check above).
+function drawDoorway(e, p) {
+  const highlight = e.interact && state === STATE.PLAY && isFacingEntity(e);
+  push();
+  translate(p.x, p.y);
+  noStroke();
+  if (highlight) {
+    drawingContext.shadowColor = 'rgba(255,220,140,0.9)';
+    drawingContext.shadowBlur = 20;
+  }
+  const w = 70, h = 150;
+  fill(60, 44, 30);
+  rect(-w / 2, -h, w, h, 4);
+  fill(28, 22, 16, 230);
+  rect(-w / 2 + 8, -h + 8, w - 16, h - 16, 3);
   if (highlight) drawingContext.shadowBlur = 0;
   pop();
 }
@@ -1111,6 +1142,8 @@ function tryStep(dir, pulling) {
     return;
   }
 
+  if (blocker.doorTo) { switchRoom(blocker.doorTo); return; }
+
   if (blocker.id === 'nightstand') onNightstandBump();
 
   if (blocker.id === 'watch' && blocker.fallen) {
@@ -1209,8 +1242,7 @@ function doInteract() {
     });
     return;
   }
-  if (e.id === 'door_bedroom') { switchRoom('bedroom'); return; }
-  if (e.id === 'door_living') { switchRoom('living'); return; }
+  if (e.doorTo) { switchRoom(e.doorTo); return; }
   if (e.interact === 'look' && e.lookKey) {
     showToast(t(e.lookKey));
     return;
