@@ -307,14 +307,14 @@ function makeLivingEntities() {
     // the TV is this room's transition trigger/anchor, same role the crib
     // plays in the bedroom -- split present/past for the same reason.
     {
-      id: 'tv_present', cells: [{ dx: 0, dy: 0 }],
+      id: 'tv_present', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], mirror: true,
       x: 3, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'use', era: 'present',
       img: 'tvOff'
     },
     {
-      id: 'tv_past', cells: [{ dx: 0, dy: 0 }],
+      id: 'tv_past', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], mirror: true,
       x: 3, y: 0, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'past',
@@ -332,19 +332,19 @@ function makeLivingEntities() {
     // couch (single 2-seat sofa sprite, not the two-piece L from the
     // original placeholder plan -- swap/add a second piece later if an
     // actual corner sofa sprite shows up), coffee table in front, decor
-    { id: 'couch', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 4, z: 0, height: 1,
+    { id: 'couch', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 2, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'couch' },
-    { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 3, y: 2, z: 0, height: 1,
+    { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 4, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'coffeeTable' },
-    { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 6, y: 1, z: 0, height: 1,
+    { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 5, y: 1, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'plant' },
 
     // the pouf the kid pushes to the shelf and climbs -- past only for now
-    { id: 'puff', cells: [{ dx: 0, dy: 0 }], x: 1, y: 3, z: 0, height: 1,
+    { id: 'puff', cells: [{ dx: 0, dy: 0 }], x: 5, y: 5, z: 0, height: 1,
       push: 'any', blocking: true, stackable: true, interact: null, era: 'past', img: 'puff' },
 
     // present-only clutter blocking the path to the TV
-    { id: 'box_living_1', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 1,
+    { id: 'box_living_1', cells: [{ dx: 0, dy: 0 }], x: 4, y: 1, z: 0, height: 1,
       push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
     { id: 'box_living_2', cells: [{ dx: 0, dy: 0 }], x: 1, y: 1, z: 0, height: 1,
       push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
