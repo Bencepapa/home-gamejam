@@ -9,7 +9,7 @@
 // ---- measured off the plate (tools/measure_plate.py); all overridden in
 // setup() by assets/sprites.json's "_room" block if present, so the whole
 // projection can be tuned from tools/anchor_editor.html without code edits ----
-let GRID_N = 6;
+let GRID_W = 6, GRID_H = 6; // separate width/height -- not every room is square (the corridor is a hallway, 7x3)
 // Per-axis screen vectors (px moved per +1 grid step). Kept independent
 // rather than a single symmetric TW/TH, because a real plate photo/render
 // can have two axes that aren't perfect mirror images of each other.
@@ -75,8 +75,10 @@ const STRINGS = {
     introFirstToast: 'A maze of boxes surrounds the crib in the middle. Somehow familiar.',
     lookTV: 'My favorite game is Ice Climber.',
     tvTouchToast: 'You touch the TV. The memory pulls you back.',
+    lookCoatrack: 'Two coats hang here now. There used to be four.',
     roomBedroom: 'Bedroom',
-    roomLiving: 'Living room'
+    roomLiving: 'Living room',
+    roomCorridor: 'Corridor'
   },
   hu: {
     title: 'HOME',
@@ -110,8 +112,10 @@ const STRINGS = {
     introFirstToast: 'A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.',
     lookTV: 'A kedvenc játékom az Ice Climber.',
     tvTouchToast: 'Megérinted a tévét. Az emlék visszahúz.',
+    lookCoatrack: 'Két kabát lóg itt most. Régen négy volt.',
     roomBedroom: 'Hálószoba',
-    roomLiving: 'Nappali'
+    roomLiving: 'Nappali',
+    roomCorridor: 'Folyosó'
   }
 };
 
@@ -172,7 +176,7 @@ function iso(x, y, z = 0) {
 }
 
 function inBounds(x, y) {
-  return x >= 0 && y >= 0 && x < GRID_N && y < GRID_N;
+  return x >= 0 && y >= 0 && x < GRID_W && y < GRID_H;
 }
 
 /* ---------------- ENTITY MODEL ----------------
@@ -343,11 +347,31 @@ function makeLivingEntities() {
   ];
 }
 
-// ---- room registry -- a lightweight stand-in for the corridor hub, which
-// doesn't exist yet. Press 1/2 in-game to switch (dev-only for now).
+// ---- corridor (folyosó) -- the hub. 7 wide x 3 deep, all 4 room doors
+// along the y=0 wall (only two rooms exist so far -- the other two door
+// slots aren't placed until gyerekszoba/ebédlő exist). Placeholder boxes
+// stand in for the coat rack and doors until there's real art; door
+// entities just call switchRoom() directly rather than a real transition,
+// since there's no per-room "return to corridor" doorway wired up yet.
+function makeCorridorEntities() {
+  return [
+    { id: 'coatrack', cells: [{ dx: 0, dy: 0 }], x: 3, y: 2, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'look', era: 'both', img: 'box1x1', lookKey: 'lookCoatrack' },
+    { id: 'door_bedroom', cells: [{ dx: 0, dy: 0 }], x: 1, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'use', era: 'both', img: 'box1x1' },
+    { id: 'door_living', cells: [{ dx: 0, dy: 0 }], x: 5, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'use', era: 'both', img: 'box1x1' }
+  ];
+}
+
+// ---- room registry. Press 1/2/3 in-game to switch rooms directly
+// (dev-only, until the corridor's own doors do this in-fiction).
 const ROOMS = {
   bedroom: {
-    gridN: 6, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
+    gridW: 6, gridH: 6, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
     originPx: { x: 720, y: 395 },
     plateImg: 'plate', lightmapImg: 'lightmap',
     spritesJsonKey: '_room', // unprefixed, for backward compatibility
@@ -359,20 +383,34 @@ const ROOMS = {
     // fallback axis vectors below, used only until tools/anchor_editor.html
     // has measured the real plate and written a '_room_living' block to
     // sprites.json (see applyRoomConfig)
-    gridN: 7, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
+    gridW: 7, gridH: 7, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
     originPx: { x: 720, y: 395 },
     plateImg: 'livingPlate', lightmapImg: null,
     spritesJsonKey: '_room_living',
     makeEntities: makeLivingEntities,
     spawn: { x: 1, y: 4, facing: { x: 1, y: 0 } },
     pastCharacter: 'kid10' // the preschooler
+  },
+  corridor: {
+    // hallway, not a room -- deliberately non-square (7 long x 3 deep).
+    // No plate generated/measured yet, same placeholder-axis situation the
+    // living room started in.
+    gridW: 7, gridH: 3, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
+    originPx: { x: 720, y: 395 },
+    plateImg: null, lightmapImg: null,
+    spritesJsonKey: '_room_corridor',
+    makeEntities: makeCorridorEntities,
+    spawn: { x: 3, y: 1, facing: { x: 0, y: -1 } },
+    pastCharacter: null // no flashback scene of its own (yet)
   }
 };
 let currentRoomId = 'bedroom';
+const ROOM_NAME_KEYS = { bedroom: 'roomBedroom', living: 'roomLiving', corridor: 'roomCorridor' };
 
 function applyRoomConfig(roomId) {
   const cfg = ROOMS[roomId];
-  GRID_N = cfg.gridN;
+  GRID_W = cfg.gridW;
+  GRID_H = cfg.gridH;
   AXIS_X = cfg.axisX;
   AXIS_Y = cfg.axisY;
   ORIGIN = cfg.originPx;
@@ -384,7 +422,13 @@ function applyRoomConfig(roomId) {
   const room = spriteMeta[cfg.spritesJsonKey];
   if (room) {
     if (room.originPx) ORIGIN = room.originPx;
-    if (room.gridN) GRID_N = room.gridN;
+    // gridW/gridH (independent dimensions) win when present; gridN is the
+    // older square-only field, kept for rooms calibrated before the
+    // corridor needed a non-square grid
+    if (room.gridW) GRID_W = room.gridW;
+    else if (room.gridN) GRID_W = room.gridN;
+    if (room.gridH) GRID_H = room.gridH;
+    else if (room.gridN) GRID_H = room.gridN;
     if (room.axisX && room.axisY) {
       AXIS_X = room.axisX;
       AXIS_Y = room.axisY;
@@ -851,12 +895,12 @@ const DEBUG_GRID = false;
 function drawDebugGrid() {
   stroke(0, 255, 255, 90);
   strokeWeight(1);
-  for (let gx = 0; gx <= GRID_N; gx++) {
-    const a = iso(gx, 0), b = iso(gx, GRID_N);
+  for (let gx = 0; gx <= GRID_W; gx++) {
+    const a = iso(gx, 0), b = iso(gx, GRID_H);
     line(a.x, a.y, b.x, b.y);
   }
-  for (let gy = 0; gy <= GRID_N; gy++) {
-    const a = iso(0, gy), b = iso(GRID_N, gy);
+  for (let gy = 0; gy <= GRID_H; gy++) {
+    const a = iso(0, gy), b = iso(GRID_W, gy);
     line(a.x, a.y, b.x, b.y);
   }
   noStroke();
@@ -872,7 +916,7 @@ function drawHUD() {
   fill(200, 190, 175);
   textAlign(LEFT, CENTER);
   textSize(12);
-  text(currentRoomId === 'living' ? t('roomLiving') : t('roomBedroom'), 22, 26);
+  text(t(ROOM_NAME_KEYS[currentRoomId] || 'roomBedroom'), 22, 26);
   fill(255, 235, 210);
   textSize(16);
   text(era === 'present' ? t('eraPresent') : t('eraPast'), 22, 47);
@@ -1017,6 +1061,7 @@ function keyPressed() {
   // dev-only room switch, stands in for the corridor hub until it exists
   if (key === '1') { switchRoom('bedroom'); return; }
   if (key === '2') { switchRoom('living'); return; }
+  if (key === '3') { switchRoom('corridor'); return; }
   if (['ArrowRight', 'd', 'D'].includes(key)) tryStep(DIRS.right, keyIsDown(16));
   else if (['ArrowLeft', 'a', 'A'].includes(key)) tryStep(DIRS.left, keyIsDown(16));
   else if (['ArrowDown', 's', 'S'].includes(key)) tryStep(DIRS.down, keyIsDown(16));
@@ -1146,6 +1191,8 @@ function doInteract() {
     });
     return;
   }
+  if (e.id === 'door_bedroom') { switchRoom('bedroom'); return; }
+  if (e.id === 'door_living') { switchRoom('living'); return; }
   if (e.interact === 'look' && e.lookKey) {
     showToast(t(e.lookKey));
     return;

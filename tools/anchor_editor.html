@@ -69,6 +69,7 @@
     <div id="calbar">
       <label><input type="checkbox" id="showGrid"> rács előnézet</label>
       <label><span id="gridNLabel">N</span> <input type="number" id="gridN" value="6" step="1" style="width:40px;"></label>
+      <label id="gridHField"><span>H (mélység, y)</span> <input type="number" id="gridH" value="6" step="1" style="width:40px;"></label>
       <label>TW <input type="number" id="gridTW" step="0.1"></label>
       <label>TH <input type="number" id="gridTH" step="0.1"></label>
       <span style="width:1px; height:18px; background:#444;"></span>
@@ -230,6 +231,7 @@ function select(key, isRoom, path) {
   el('ax').closest('label').style.display = isRoom ? 'none' : '';
   el('ay').closest('label').style.display = isRoom ? 'none' : '';
   el('ascale').closest('label').style.display = isRoom ? 'none' : '';
+  el('gridHField').style.display = isRoom ? '' : 'none'; // only rooms can be non-square
   el('calBtn').style.display = isRoom ? '' : 'none';
   el('marker').className = 'marker' + (isRoom ? ' origin' : '');
 }
@@ -237,8 +239,9 @@ function select(key, isRoom, path) {
 function refreshFields() {
   if (!current) return;
   const rd = ensureRoomData(activeRoomKey);
-  el('gridN').value = current.isRoom ? (rd.gridN || 6) : spritePreviewN;
-  el('gridNLabel').textContent = current.isRoom ? 'N (rács méret)' : 'N (előnézet cellák)';
+  el('gridN').value = current.isRoom ? (rd.gridW || rd.gridN || 6) : spritePreviewN;
+  el('gridH').value = rd.gridH || rd.gridN || 6;
+  el('gridNLabel').textContent = current.isRoom ? 'N (szélesség, x)' : 'N (előnézet cellák)';
   el('gridTW').value = (rd.tileW || 200).toFixed ? rd.tileW.toFixed(2) : rd.tileW;
   el('gridTH').value = (rd.tileH || 100).toFixed ? rd.tileH.toFixed(2) : rd.tileH;
   if (current.isRoom) {
@@ -289,14 +292,15 @@ function drawGridOverlay() {
   const { axisX, axisY } = currentAxes();
 
   if (current.isRoom) {
-    const N = parseInt(el('gridN').value) || 6;
+    const NW = parseInt(el('gridN').value) || 6;
+    const NH = parseInt(el('gridH').value) || 6;
     const origin = ensureRoomData(activeRoomKey).originPx;
     function isoPt(x,y){ return [origin.x + x*axisX.x + y*axisY.x, origin.y + x*axisX.y + y*axisY.y]; }
     ctx.strokeStyle = 'rgba(0,255,255,0.8)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let gx=0; gx<=N; gx++){ const a=isoPt(gx,0), b=isoPt(gx,N); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
-    for (let gy=0; gy<=N; gy++){ const a=isoPt(0,gy), b=isoPt(N,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for (let gx=0; gx<=NW; gx++){ const a=isoPt(gx,0), b=isoPt(gx,NH); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
+    for (let gy=0; gy<=NH; gy++){ const a=isoPt(0,gy), b=isoPt(NW,gy); ctx.moveTo(a[0],a[1]); ctx.lineTo(b[0],b[1]); }
     ctx.stroke();
     ctx.fillStyle = '#6bd1ff';
     ctx.beginPath(); ctx.arc(origin.x, origin.y, 4, 0, 7); ctx.fill();
@@ -373,8 +377,14 @@ el('zoom').addEventListener('input', () => { layoutMarker(); });
 el('showGrid').addEventListener('change', drawGridOverlay);
 el('gridN').addEventListener('input', () => {
   const n = parseInt(el('gridN').value) || (current && current.isRoom ? 6 : 2);
-  if (current && current.isRoom) { ensureRoomData(activeRoomKey).gridN = n; updateJsonPreview(); }
+  if (current && current.isRoom) { ensureRoomData(activeRoomKey).gridW = n; updateJsonPreview(); }
   else { spritePreviewN = n; } // never touches room data -- preview only
+  drawGridOverlay();
+});
+el('gridH').addEventListener('input', () => {
+  if (!current || !current.isRoom) return;
+  ensureRoomData(activeRoomKey).gridH = parseInt(el('gridH').value) || 6;
+  updateJsonPreview();
   drawGridOverlay();
 });
 el('activeRoom').addEventListener('change', () => {
@@ -436,14 +446,16 @@ function handleCalibrationClick(e) {
   if (calPoints.length === 1) {
     el('calHint').textContent = `2/3: kattints a +x tengely végére (rács (${el('gridN').value},0) sarka)`;
   } else if (calPoints.length === 2) {
-    el('calHint').textContent = `3/3: kattints a +y tengely végére (rács (0,${el('gridN').value}) sarka)`;
+    el('calHint').textContent = `3/3: kattints a +y tengely végére (rács (0,${el('gridH').value}) sarka)`;
   } else if (calPoints.length === 3) {
-    const N = parseInt(el('gridN').value) || 6;
+    const NW = parseInt(el('gridN').value) || 6;
+    const NH = parseInt(el('gridH').value) || 6;
     const [o, xEnd, yEnd] = calPoints;
     const rd = ensureRoomData(activeRoomKey);
     rd.originPx = { x: Math.round(o.x*10)/10, y: Math.round(o.y*10)/10 };
-    rd.axisX = { x: Math.round((xEnd.x-o.x)/N*1000)/1000, y: Math.round((xEnd.y-o.y)/N*1000)/1000 };
-    rd.axisY = { x: Math.round((yEnd.x-o.x)/N*1000)/1000, y: Math.round((yEnd.y-o.y)/N*1000)/1000 };
+    rd.axisX = { x: Math.round((xEnd.x-o.x)/NW*1000)/1000, y: Math.round((xEnd.y-o.y)/NW*1000)/1000 };
+    rd.axisY = { x: Math.round((yEnd.x-o.x)/NH*1000)/1000, y: Math.round((yEnd.y-o.y)/NH*1000)/1000 };
+    rd.gridW = NW; rd.gridH = NH;
     rd.tileW = Math.round(Math.abs(rd.axisX.x - rd.axisY.x)*100)/100;
     rd.tileH = Math.round((rd.axisX.y + rd.axisY.y)*100)/100;
     el('calHint').textContent = 'kész — axisX/axisY frissítve.';
