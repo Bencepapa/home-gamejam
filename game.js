@@ -391,6 +391,7 @@ function applyRoomConfig(roomId) {
       AXIS_Y = { x: -tw / 2, y: th / 2 };
     }
   }
+  computeDirs();
 }
 
 function switchRoom(roomId) {
@@ -987,13 +988,22 @@ function drawToast() {
 function mouseDesign() { return toDesign(mouseX, mouseY); }
 function pointInRect(p, x, y, w, h) { return p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h; }
 
-// +x on this grid points screen-left (see AXIS_X), so the physical
-// right/left keys are intentionally mapped to -x/+x -- up/down (the y
-// axis) already pointed the intuitive way and needed no swap.
-const DIRS = {
-  right: { x: -1, y: 0 }, left: { x: 1, y: 0 },
-  down: { x: 0, y: 1 }, up: { x: 0, y: -1 }
-};
+// Whether +grid-x/+grid-y point toward screen-right/screen-down depends
+// on each room's OWN measured AXIS_X/AXIS_Y (independently 3-point
+// calibrated per room, so their signs aren't guaranteed to match --
+// the bedroom's +x happens to point screen-LEFT, so its right/left keys
+// need swapping; a room whose +x points screen-right doesn't). Recomputed
+// whenever the active room's axes change, instead of one hardcoded
+// mapping tuned for a single room's calibration.
+let DIRS = { right: { x: -1, y: 0 }, left: { x: 1, y: 0 }, down: { x: 0, y: 1 }, up: { x: 0, y: -1 } };
+function computeDirs() {
+  const rightSign = AXIS_X.x > 0 ? 1 : -1;
+  const downSign = AXIS_Y.y > 0 ? 1 : -1;
+  DIRS = {
+    right: { x: rightSign, y: 0 }, left: { x: -rightSign, y: 0 },
+    down: { x: 0, y: downSign }, up: { x: 0, y: -downSign }
+  };
+}
 
 function keyPressed() {
   if (state === STATE.INTRO) {
