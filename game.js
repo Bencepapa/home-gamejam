@@ -72,7 +72,7 @@ const STRINGS = {
     quietRoomToast: "It's quiet. Just the room.",
     watchBreakToast: "That's not how it happened. How was it again?",
     watchResetToast: 'The watch is back on the nightstand.',
-    introFirstToast: 'A maze of boxes surrounds the crib in the middle. Somehow familiar.',
+    introFirstToast: "I'm home. I haven't been here in a long time.",
     lookTV: 'My favorite game is Ice Climber.',
     tvTouchToast: 'You touch the TV. The memory pulls you back.',
     lookCoatrack: 'Two coats hang here now. There used to be four.',
@@ -109,7 +109,7 @@ const STRINGS = {
     quietRoomToast: 'Csend van. Csak a szoba.',
     watchBreakToast: 'Nem így történt, hogy is volt?',
     watchResetToast: 'Az óra visszakerül az éjjeliszekrényre.',
-    introFirstToast: 'A doboz-labirintus közepén a bölcső áll. Valahogy ismerős.',
+    introFirstToast: 'Itthon vagyok. Nem jártam itt régen.',
     lookTV: 'A kedvenc játékom az Ice Climber.',
     tvTouchToast: 'Megérinted a tévét. Az emlék visszahúz.',
     lookCoatrack: 'Két kabát lóg itt most. Régen négy volt.',
@@ -404,7 +404,7 @@ const ROOMS = {
     pastCharacter: null // no flashback scene of its own (yet)
   }
 };
-let currentRoomId = 'bedroom';
+let currentRoomId = 'corridor'; // the game starts in the hallway, not a room
 const ROOM_NAME_KEYS = { bedroom: 'roomBedroom', living: 'roomLiving', corridor: 'roomCorridor' };
 
 function applyRoomConfig(roomId) {
@@ -909,6 +909,7 @@ function drawDebugGrid() {
 /* ---------------- HUD ---------------- */
 
 let undoButton = null;
+let corridorButton = null;
 function drawHUD() {
   push();
   fill(0, 0, 0, 130);
@@ -920,6 +921,23 @@ function drawHUD() {
   fill(255, 235, 210);
   textSize(16);
   text(era === 'present' ? t('eraPresent') : t('eraPast'), 22, 47);
+
+  // return-to-corridor -- only the adult (present) can walk the house;
+  // a flashback is self-contained and always returns to its own room
+  // on its own, so this has no place mid-memory
+  if (era === 'present' && currentRoomId !== 'corridor') {
+    const cbw = 150, cbh = 34, cbx = 12, cby = 78;
+    const chov = pointInRect(mouseDesign(), cbx, cby, cbw, cbh);
+    fill(chov ? color(230, 170, 90) : color(0, 0, 0, 140));
+    rect(cbx, cby, cbw, cbh, 8);
+    fill(255, 235, 210);
+    textAlign(CENTER, CENTER);
+    textSize(13);
+    text('↩ ' + t('roomCorridor'), cbx + cbw / 2, cby + cbh / 2);
+    corridorButton = { x: cbx, y: cby, w: cbw, h: cbh };
+  } else {
+    corridorButton = null;
+  }
 
   const bw = 90, bh = 60;
   const bx = 12, by = DESIGN_H - bh - 16;
@@ -1382,6 +1400,10 @@ function handlePress(px, py) {
     return;
   }
   if (state === STATE.WIN) return;
+  if (corridorButton && pointInRect(p, corridorButton.x, corridorButton.y, corridorButton.w, corridorButton.h)) {
+    switchRoom('corridor');
+    return;
+  }
   if (undoButton && pointInRect(p, undoButton.x, undoButton.y, undoButton.w, undoButton.h)) {
     doUndo();
     return;
