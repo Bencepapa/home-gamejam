@@ -78,7 +78,9 @@ const STRINGS = {
     lookCoatrack: 'Two coats hang here now. There used to be four.',
     roomBedroom: 'Bedroom',
     roomLiving: 'Living room',
-    roomCorridor: 'Corridor'
+    roomCorridor: 'Corridor',
+    rotateTitle: 'Rotate your phone',
+    rotateHint: 'This plays best in landscape.'
   },
   hu: {
     title: 'HOME',
@@ -115,7 +117,9 @@ const STRINGS = {
     lookCoatrack: 'Két kabát lóg itt most. Régen négy volt.',
     roomBedroom: 'Hálószoba',
     roomLiving: 'Nappali',
-    roomCorridor: 'Folyosó'
+    roomCorridor: 'Folyosó',
+    rotateTitle: 'Fordítsd el a telefonod',
+    rotateHint: 'Fekvő nézetben megy igazán jól.'
   }
 };
 
@@ -582,6 +586,16 @@ function toDesign(px, py) {
 
 function draw() {
   background(8, 10, 14);
+
+  // phones/small tablets: the whole layout (grid, HUD, touch targets) is
+  // designed for landscape -- portrait squeezes scaleF down so far that
+  // every button becomes unusably small, so show a rotate prompt instead
+  // of a broken tiny UI
+  if (height > width && min(width, height) < 700) {
+    drawRotatePrompt();
+    return;
+  }
+
   push();
   translate(offX, offY);
   scale(scaleF);
@@ -592,11 +606,37 @@ function draw() {
   } else {
     updateTransition();
     drawScene();
-    drawHUD();
     if (transitioning) drawFade();
     if (state === STATE.WIN) drawWinOverlay();
   }
   drawToast();
+  pop();
+
+  // screen-space UI overlay, deliberately OUTSIDE the scaled/design-space
+  // transform above -- sized off real width/height so touch targets stay
+  // usable regardless of how small scaleF ends up (see uiSize())
+  drawLangToggle();
+  if (state !== STATE.INTRO) drawHUD();
+}
+
+function drawRotatePrompt() {
+  const s = min(width, height);
+  textAlign(CENTER, CENTER);
+  fill(255, 236, 200);
+  textSize(s * 0.075);
+  text(t('rotateTitle'), width / 2, height / 2 - s * 0.12);
+  fill(190);
+  textSize(s * 0.04);
+  text(t('rotateHint'), width / 2, height / 2 + s * 0.02);
+
+  push();
+  translate(width / 2, height / 2 - s * 0.28);
+  rotate(sin(millis() * 0.0025) * radians(40) - radians(90));
+  noFill();
+  stroke(255, 236, 200);
+  strokeWeight(max(3, s * 0.008));
+  rectMode(CENTER);
+  rect(0, 0, s * 0.09, s * 0.16, s * 0.015);
   pop();
 }
 
@@ -638,20 +678,26 @@ function drawIntro() {
   text(t('enterHint'), cx, cy + 50);
   introButton = { x: bx, y: by, w: bw, h: bh };
 
-  drawLangToggle();
   pop();
 }
 
+// screen-space size unit for HUD elements, deliberately NOT tied to
+// scaleF/DESIGN_W -- a touch target must stay a sane physical size no
+// matter how small the world ends up scaled to fit the viewport
+function uiSize() { return constrain(min(width, height) * 0.15, 60, 110); }
+
 let langButton = null;
 function drawLangToggle() {
-  const bw = 64, bh = 32;
-  const bx = DESIGN_W - bw - 24, by = 24;
-  const hov = pointInRect(mouseDesign(), bx, by, bw, bh);
+  const s = uiSize();
+  const bw = s * 1.1, bh = s * 0.5;
+  const pad = s * 0.28;
+  const bx = width - bw - pad, by = pad;
+  const hov = pointInRect({ x: mouseX, y: mouseY }, bx, by, bw, bh);
   fill(hov ? color(255, 255, 255, 55) : color(255, 255, 255, 22));
-  rect(bx, by, bw, bh, 6);
+  rect(bx, by, bw, bh, 8);
   fill(230);
   textAlign(CENTER, CENTER);
-  textSize(14);
+  textSize(bh * 0.42);
   text(lang === 'hu' ? 'EN' : 'HU', bx + bw / 2, by + bh / 2 + 1);
   langButton = { x: bx, y: by, w: bw, h: bh };
 }
@@ -963,59 +1009,72 @@ function drawDebugGrid() {
 let undoButton = null;
 let corridorButton = null;
 function drawHUD() {
+  const s = uiSize();
+  const pad = s * 0.28;
+  const mp = { x: mouseX, y: mouseY };
+
   push();
   fill(0, 0, 0, 130);
-  rect(12, 12, 220, 54, 8);
+  rect(pad, pad, s * 2.4, s * 0.85, 8);
   fill(200, 190, 175);
   textAlign(LEFT, CENTER);
-  textSize(12);
-  text(t(ROOM_NAME_KEYS[currentRoomId] || 'roomBedroom'), 22, 26);
+  textSize(s * 0.15);
+  text(t(ROOM_NAME_KEYS[currentRoomId] || 'roomBedroom'), pad * 1.8, pad + s * 0.22);
   fill(255, 235, 210);
-  textSize(16);
-  text(era === 'present' ? t('eraPresent') : t('eraPast'), 22, 47);
+  textSize(s * 0.2);
+  text(era === 'present' ? t('eraPresent') : t('eraPast'), pad * 1.8, pad + s * 0.58);
 
   // return-to-corridor -- only the adult (present) can walk the house;
   // a flashback is self-contained and always returns to its own room
   // on its own, so this has no place mid-memory
   if (era === 'present' && currentRoomId !== 'corridor') {
-    const cbw = 150, cbh = 34, cbx = 12, cby = 78;
-    const chov = pointInRect(mouseDesign(), cbx, cby, cbw, cbh);
+    const cbw = s * 2.4, cbh = s * 0.52, cbx = pad, cby = pad + s * 0.85 + pad * 0.6;
+    const chov = pointInRect(mp, cbx, cby, cbw, cbh);
     fill(chov ? color(230, 170, 90) : color(0, 0, 0, 140));
     rect(cbx, cby, cbw, cbh, 8);
     fill(255, 235, 210);
     textAlign(CENTER, CENTER);
-    textSize(13);
+    textSize(s * 0.15);
     text('↩ ' + t('roomCorridor'), cbx + cbw / 2, cby + cbh / 2);
     corridorButton = { x: cbx, y: cby, w: cbw, h: cbh };
   } else {
     corridorButton = null;
   }
 
-  const bw = 90, bh = 60;
-  const bx = 12, by = DESIGN_H - bh - 16;
-  const hov = pointInRect(mouseDesign(), bx, by, bw, bh);
-  fill(hov ? color(230, 170, 90) : color(0, 0, 0, 140));
-  rect(bx, by, bw, bh, 10);
+  // undo -- bottom-left, a fixed-size square regardless of world scale
+  const ubx = pad, uby = height - s - pad;
+  const uhov = pointInRect(mp, ubx, uby, s, s);
+  fill(uhov ? color(230, 170, 90) : color(0, 0, 0, 150));
+  rect(ubx, uby, s, s, s * 0.15);
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(28);
-  text('↺', bx + bw / 2, by + bh / 2 - 4);
-  textSize(11);
-  text(t('undo'), bx + bw / 2, by + bh / 2 + 20);
-  undoButton = { x: bx, y: by, w: bw, h: bh };
+  textSize(s * 0.4);
+  text('↺', ubx + s / 2, uby + s * 0.4);
+  textSize(s * 0.14);
+  text(t('undo'), ubx + s / 2, uby + s * 0.76);
+  undoButton = { x: ubx, y: uby, w: s, h: s };
 
-  // mobile action button
-  const abw = 90, abh = 90;
-  const abx = DESIGN_W - abw - 24, aby = DESIGN_H - abh - 24;
-  const ahov = pointInRect(mouseDesign(), abx, aby, abw, abh);
-  fill(ahov ? color(255, 210, 140) : color(230, 170, 90, 220));
-  circle(abx + abw / 2, aby + abh / 2, abw);
-  fill(30, 20, 10);
-  textSize(14);
-  text(t('interact'), abx + abw / 2, aby + abh / 2);
-  actionButton = { x: abx, y: aby, w: abw, h: abh };
+  // interact -- bottom-right. Standard mobile-game "action button" look:
+  // translucent dark disc, a light ring, no solid fill color -- not the
+  // flat salmon circle this used to be.
+  const actSize = s * 1.2;
+  const abx = width - actSize - pad, aby = height - actSize - pad;
+  const ahov = pointInRect(mp, abx, aby, actSize, actSize);
+  const acx = abx + actSize / 2, acy = aby + actSize / 2;
+  noStroke();
+  fill(0, 0, 0, ahov ? 130 : 100);
+  circle(acx, acy, actSize);
+  noFill();
+  stroke(255, 255, 255, ahov ? 230 : 150);
+  strokeWeight(max(2, actSize * 0.035));
+  circle(acx, acy, actSize * 0.82);
+  noStroke();
+  fill(255, 255, 255, ahov ? 255 : 215);
+  textAlign(CENTER, CENTER);
+  textSize(actSize * 0.15);
+  text(t('interact'), acx, acy);
+  actionButton = { x: abx, y: aby, w: actSize, h: actSize };
 
-  drawLangToggle();
   pop();
 }
 
@@ -1433,41 +1492,66 @@ function touchStarted() {
   if (touches.length > 0) { touchStart = { x: touches[0].x, y: touches[0].y }; handlePress(touches[0].x, touches[0].y); }
   return false;
 }
+// Picks whichever of the four grid-step screen directions (+x/-x/+y/-y,
+// per THIS room's own measured axis vectors) a swipe aligns with most
+// closely, via cosine similarity against each candidate's actual screen
+// vector. NOT a cardinal up/down/left/right read: the iso grid's axes
+// run diagonally on screen, so a swipe along a floor-tile edge should
+// follow that diagonal, not the screen's compass directions. Room-aware
+// for the same reason DIRS/computeDirs() is -- a room's axis signs
+// aren't guaranteed to match another room's (see the bedroom/living
+// mismatch that motivated that fix).
+function swipeToGridDir(dx, dy) {
+  const candidates = [
+    { x: 1, y: 0, sx: AXIS_X.x, sy: AXIS_X.y },
+    { x: -1, y: 0, sx: -AXIS_X.x, sy: -AXIS_X.y },
+    { x: 0, y: 1, sx: AXIS_Y.x, sy: AXIS_Y.y },
+    { x: 0, y: -1, sx: -AXIS_Y.x, sy: -AXIS_Y.y }
+  ];
+  let best = candidates[0], bestScore = -Infinity;
+  for (const c of candidates) {
+    const mag = Math.hypot(c.sx, c.sy) || 1;
+    const score = (dx * c.sx + dy * c.sy) / mag;
+    if (score > bestScore) { bestScore = score; best = c; }
+  }
+  return { x: best.x, y: best.y };
+}
+
 function touchEnded() {
   if (!touchStart) return false;
-  const p = toDesign(mouseX, mouseY);
-  const start = toDesign(touchStart.x, touchStart.y);
-  const dx = p.x - start.x, dy = p.y - start.y;
+  const dx = mouseX - touchStart.x, dy = mouseY - touchStart.y;
   touchStart = null;
   if (state !== STATE.PLAY || transitioning) return false;
   if (abs(dx) < 30 && abs(dy) < 30) return false; // treat as tap, handled in handlePress
-  if (abs(dx) > abs(dy)) tryStep(dx > 0 ? DIRS.right : DIRS.left, false);
-  else tryStep(dy > 0 ? DIRS.down : DIRS.up, false);
+  tryStep(swipeToGridDir(dx, dy), false);
   return false;
 }
 
 function handlePress(px, py) {
-  const p = toDesign(px, py);
-  if (langButton && pointInRect(p, langButton.x, langButton.y, langButton.w, langButton.h)) {
+  // screen-space UI (see uiSize()) -- checked against raw px,py, not the
+  // design-space coordinates the world/intro button below uses
+  const raw = { x: px, y: py };
+  if (langButton && pointInRect(raw, langButton.x, langButton.y, langButton.w, langButton.h)) {
     setLang(lang === 'hu' ? 'en' : 'hu');
     return;
   }
   if (state === STATE.INTRO) {
+    const p = toDesign(px, py);
     if (introButton && pointInRect(p, introButton.x, introButton.y, introButton.w, introButton.h)) {
       startGame();
     }
     return;
   }
   if (state === STATE.WIN) return;
-  if (corridorButton && pointInRect(p, corridorButton.x, corridorButton.y, corridorButton.w, corridorButton.h)) {
+  if (corridorButton && pointInRect(raw, corridorButton.x, corridorButton.y, corridorButton.w, corridorButton.h)) {
     switchRoom('corridor');
     return;
   }
-  if (undoButton && pointInRect(p, undoButton.x, undoButton.y, undoButton.w, undoButton.h)) {
+  if (undoButton && pointInRect(raw, undoButton.x, undoButton.y, undoButton.w, undoButton.h)) {
     doUndo();
     return;
   }
-  if (actionButton && pointInRect(p, actionButton.x, actionButton.y, actionButton.w, actionButton.h)) {
+  if (actionButton && pointInRect(raw, actionButton.x, actionButton.y, actionButton.w, actionButton.h)) {
     doInteract();
     return;
   }
