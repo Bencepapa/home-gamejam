@@ -292,7 +292,15 @@ function makeBedroomEntities() {
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'present',
       img: 'wardrobeEmpty' // emptied out for the move, not just a grayed copy of the full one
-    }
+    },
+
+    // return-to-corridor doorway -- off-grid like the corridor's own doors
+    // (see makeCorridorEntities), and hidden since the real plate already
+    // paints the doorway; present only, matching the HUD's own corridor
+    // button (a flashback is self-contained, no leaving mid-memory)
+    { id: 'door_corridor', cells: [{ dx: 0, dy: 0 }], x: -1, y: 4, z: 0, height: 1,
+      push: false, blocking: false, stackable: false,
+      interact: 'use', era: 'present', doorTo: 'corridor', hidden: true }
   ];
 }
 
@@ -349,7 +357,12 @@ function makeLivingEntities() {
     { id: 'box_living_2', cells: [{ dx: 0, dy: 0 }], x: 1, y: 1, z: 0, height: 1,
       push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
     { id: 'box_living_3', cells: [{ dx: 0, dy: 0 }], x: 2, y: 5, z: 0, height: 1,
-      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' }
+      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
+
+    // return-to-corridor doorway -- see makeBedroomEntities for the same
+    { id: 'door_corridor', cells: [{ dx: 0, dy: 0 }], x: -1, y: 5, z: 0, height: 1,
+      push: false, blocking: false, stackable: false,
+      interact: 'use', era: 'present', doorTo: 'corridor', hidden: true }
   ];
 }
 
@@ -773,8 +786,8 @@ function drawEntity(e) {
   }
   const img = images[e.img];
   if (!img) {
-    if (e.doorTo) drawDoorway(e, p); // no real door art yet -- see drawDoorway
-    return;
+    if (e.doorTo && !e.hidden) drawDoorway(e, p); // no real door art yet -- see drawDoorway
+    return; // e.hidden: the real plate already shows the doorway, nothing to draw
   }
   const desatAmt = desaturationAmount(e); // 0 = full color, 1 = fully gray
   const desatImg = imagesDesat[e.img];
