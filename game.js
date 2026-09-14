@@ -359,21 +359,23 @@ function makeLivingEntities() {
 // stands in for the coat rack until there's real art; doors have no
 // sprite at all yet -- they're drawn procedurally as a plain doorframe
 // (see drawDoorway) since they're wall openings, not furniture, and a
-// cardboard box read as the wrong kind of object. Walking into a door
-// OR interacting with it both work (see tryStep/doInteract's `doorTo`
-// checks) -- it doesn't call a real transition (fade), it just calls
-// switchRoom() directly, since there's no per-room "return to corridor"
-// doorway wired up yet either.
+// cardboard box read as the wrong kind of object. Positioned at y:-1 --
+// just past the y=0 wall, outside the walkable grid -- since a door is
+// an opening IN the wall, not an obstacle sitting on the floor; walking
+// toward one (tryStep's `doorTo` check, which runs before the inBounds
+// gate) or interacting with it both work. Doesn't play a real transition
+// (fade), just calls switchRoom() directly, since there's no per-room
+// "return to corridor" doorway wired up yet either.
 function makeCorridorEntities() {
   return [
     { id: 'coatrack', cells: [{ dx: 0, dy: 0 }], x: 3, y: 2, z: 0, height: 1,
       push: false, blocking: true, stackable: false,
       interact: 'look', era: 'both', img: 'box1x1', lookKey: 'lookCoatrack' },
-    { id: 'door_bedroom', cells: [{ dx: 0, dy: 0 }], x: 1, y: 0, z: 0, height: 1,
-      push: false, blocking: true, stackable: false,
+    { id: 'door_bedroom', cells: [{ dx: 0, dy: 0 }], x: 1, y: -1, z: 0, height: 1,
+      push: false, blocking: false, stackable: false,
       interact: 'use', era: 'both', doorTo: 'bedroom' },
-    { id: 'door_living', cells: [{ dx: 0, dy: 0 }], x: 5, y: 0, z: 0, height: 1,
-      push: false, blocking: true, stackable: false,
+    { id: 'door_living', cells: [{ dx: 0, dy: 0 }], x: 5, y: -1, z: 0, height: 1,
+      push: false, blocking: false, stackable: false,
       interact: 'use', era: 'both', doorTo: 'living' }
   ];
 }
@@ -1139,6 +1141,14 @@ function tryStep(dir, pulling) {
 
   const tx = actor.x + dir.x, ty = actor.y + dir.y;
   actor.facing = dir;
+
+  // doors sit just past the grid edge (a wall opening, not a walkable
+  // tile), so check for one at the target cell BEFORE the inBounds gate --
+  // otherwise walking toward one would just stop cold at the boundary,
+  // same as any other wall
+  const doorHere = activeEntities().find(en => en.doorTo && en.cells.some(c => en.x + c.dx === tx && en.y + c.dy === ty));
+  if (doorHere) { switchRoom(doorHere.doorTo); return; }
+
   if (!inBounds(tx, ty)) return;
 
   const blocker = entityAt(tx, ty, actor.z, e => e.blocking);
@@ -1147,8 +1157,6 @@ function tryStep(dir, pulling) {
     else if (standable(tx, ty, actor.z + 1)) { actor.x = tx; actor.y = ty; actor.z = actor.z + 1; triggerWalk(); }
     return;
   }
-
-  if (blocker.doorTo) { switchRoom(blocker.doorTo); return; }
 
   if (blocker.id === 'nightstand') onNightstandBump();
 
