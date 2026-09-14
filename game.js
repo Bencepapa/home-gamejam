@@ -377,7 +377,7 @@ function makeLivingEntities() {
     // their depth-sort key to tv_past's own front cell (same trick as the
     // watch/nightstand and drawing/table pairs), broken by insertion
     // order since they're listed after it.
-    { id: 'console', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 0.1,
+    { id: 'console', cells: [{ dx: 0, dy: 0 }], x: 4, y: 1, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false,
       attachedTo: 'tv_past', attachOffset: { x: 90, y: -35 },
       interact: null, era: 'past', img: 'console' },
@@ -411,7 +411,7 @@ function makeLivingEntities() {
     // (x/y match the couch's own front cell, listed right after it)
     { id: 'controller', cells: [{ dx: 0, dy: 0 }], x: 2, y: 5, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false,
-      attachedTo: 'couch', attachOffset: { x: 0, y: -40 },
+      attachedTo: 'couch', attachOffset: { x: 0, y: -15 },
       interact: null, era: 'past', img: 'controller' },
 
     { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 4, y: 4, z: 0, height: 1,
@@ -436,7 +436,7 @@ function makeLivingEntities() {
     // only the pixel offset does.
     { id: 'drawing', cells: [{ dx: 0, dy: 0 }], x: 4, y: 5, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false, pickedUp: false,
-      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x, y: -100 },
+      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x, y: -45 },
       interact: null, era: 'past', img: 'drawing' },
 
     // the crayon the kid drew with, left sitting on top of the drawing --
@@ -445,7 +445,7 @@ function makeLivingEntities() {
     // of the three, i.e. visually on top of the paper
     { id: 'crayon', cells: [{ dx: 0, dy: 0 }], x: 4, y: 5, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false,
-      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x + 45, y: -100 },
+      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x + 45, y: -45 },
       interact: null, era: 'past', img: 'crayon' },
 
     // the pouf the kid pushes to the shelf and climbs -- past only for now
