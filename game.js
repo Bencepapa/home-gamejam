@@ -45,15 +45,15 @@ const DEFAULT_SPRITE_META = { anchor: { x: 0.5, y: 0.9 }, scale: 1 };
 const STRINGS = {
   en: {
     title: 'HOME',
-    subtitle: "Your parents' old bedroom. You left something in there.",
+    subtitle: 'The old family house, all packed up now. Maybe it still hides a secret or two.',
     enter: 'Enter',
     enterHint: 'Click, or press Space / Enter',
     eraPresent: 'Present — the room, now',
     eraPast: 'Past — the memory',
     undo: 'undo',
     interact: 'interact',
-    winTitle: "You found dad's watch.",
-    winSubtitle: "That's it. I found my way home.",
+    winTitle: 'Everything I came for is here.',
+    winSubtitle: 'The watch, the drawing. I can close the door now.',
     lookBed: "My parents' bed. I used to crawl in here after a bad dream.",
     lookNightstand: "Dad's watch and glasses used to sit here every evening.",
     lookWardrobe: 'I hide in here when mom is angry.',
@@ -72,7 +72,7 @@ const STRINGS = {
     quietRoomToast: "It's quiet. Just the room.",
     watchBreakToast: "That's not how it happened. How was it again?",
     watchResetToast: 'The watch is back on the nightstand.',
-    introFirstToast: "I'm home. I haven't been here in a long time.",
+    introFirstToast: "I still have to finish packing up my parents' things.",
     lookTV: 'My favorite game is Ice Climber.',
     tvTouchToast: 'You touch the TV. The memory pulls you back.',
     lookCoatrack: 'Two coats hang here now. There used to be four.',
@@ -80,6 +80,14 @@ const STRINGS = {
     hideDrawingToast: 'I tuck it in among the books.',
     foundDrawingToast: "It's my family. But mom isn't in it.",
     drawingBackToast: 'Mom is on this side.',
+    lookShelf1: "Half the paperbacks are already boxed. The rest just sit here, waiting their turn.",
+    lookShelf2: "An E.T. plush is wedged between the spines. Nobody's thought to box him yet.",
+    lookBoxLiving1: 'Kitchen things, wrapped in old newspaper. I recognize the mugs.',
+    lookBoxLiving2: 'Board games, the box corners gone soft from a hundred rainy afternoons.',
+    lookBoxLiving3: "Just cables and remotes, for a TV that isn't here anymore.",
+    lookPlanterLiving: 'A potted plant, somehow still alive after all these years.',
+    lookCouchLiving: "The couch. I used to fall asleep here before the cartoons even finished.",
+    corridorTableToast: "An empty table by the door. There's room for what I still need to find.",
     tapToContinue: 'Tap, click, or press Space',
     roomBedroom: 'Bedroom',
     roomLiving: 'Living room',
@@ -89,15 +97,15 @@ const STRINGS = {
   },
   hu: {
     title: 'HOME',
-    subtitle: 'A szülők egykori hálószobája. Valamit ott hagytál benne.',
+    subtitle: 'A régi szülői ház összepakolva, talán rejt még titkokat.',
     enter: 'Belépek',
     enterHint: 'Kattints, vagy nyomj Space / Entert',
     eraPresent: 'Jelen — a szoba most',
     eraPast: 'Múlt — az emlék',
     undo: 'vissza',
     interact: 'interakció',
-    winTitle: 'Megtaláltad apa óráját.',
-    winSubtitle: 'Ennyi volt. Hazataláltam.',
+    winTitle: 'Minden megvan, amiért jöttem.',
+    winSubtitle: 'Az óra, a rajz. Most már be tudom zárni magam mögött az ajtót.',
     lookBed: 'A szüleim ágya. Ide bújtam be, ha rosszat álmodtam.',
     lookNightstand: 'Apa órája és a szemüvege szokott itt lenni esténként.',
     lookWardrobe: 'Ide bújok, ha anya mérges.',
@@ -116,7 +124,7 @@ const STRINGS = {
     quietRoomToast: 'Csend van. Csak a szoba.',
     watchBreakToast: 'Nem így történt, hogy is volt?',
     watchResetToast: 'Az óra visszakerül az éjjeliszekrényre.',
-    introFirstToast: 'Itthon vagyok. Nem jártam itt régen.',
+    introFirstToast: 'Még be kell fejeznem a szüleim holmijának összepakolását.',
     lookTV: 'A kedvenc játékom az Ice Climber.',
     tvTouchToast: 'Megérinted a tévét. Az emlék visszahúz.',
     lookCoatrack: 'Két kabát lóg itt most. Régen négy volt.',
@@ -124,6 +132,14 @@ const STRINGS = {
     hideDrawingToast: 'Becsúsztatom a könyvek közé.',
     foundDrawingToast: 'Ez itt a családom. De anya nincs rajta.',
     drawingBackToast: 'Ezen az oldalon van anya.',
+    lookShelf1: 'A könyvek fele már dobozban van. A többi csak itt várja a sorát.',
+    lookShelf2: 'Egy E.T. plüss szorult a könyvek közé. Őt még senki nem pakolta be.',
+    lookBoxLiving1: 'Konyhai holmi, újságpapírba csomagolva. Ráismerek a bögrékre.',
+    lookBoxLiving2: 'Társasjátékok, a doboz sarka szétázva a sok esős délutántól.',
+    lookBoxLiving3: 'Csak kábelek és távirányítók, egy tévéhez, ami már nincs is itt.',
+    lookPlanterLiving: 'Egy cserepes növény, valahogy még mindig él ennyi év után.',
+    lookCouchLiving: 'A kanapé. Ezen szoktam elaludni, mielőtt a rajzfilm véget ért volna.',
+    corridorTableToast: 'Üres asztal az ajtó mellett. Van hely rajta annak, amit még meg kell találnom.',
     tapToContinue: 'Koppints, kattints, vagy nyomj Space-t',
     roomBedroom: 'Hálószoba',
     roomLiving: 'Nappali',
@@ -168,6 +184,7 @@ function preload() {
   images.plant = loadImage('assets/sprites/padlovirag.png');
   images.drawing = loadImage('assets/sprites/rajz.png');
   images.drawingBack = loadImage('assets/sprites/rajz_hatoldal.png');
+  images.crayon = loadImage('assets/sprites/zsirkreta.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
@@ -350,20 +367,25 @@ function makeLivingEntities() {
     // one is "empty" vs "still full" is pending the real puzzle logic.
     // interact:'use' so they glow when faced -- see doInteract's shelf1/
     // shelf2 branch for the hide-the-drawing (past) / find-it (present) logic
+    // lookKey is only used as a fallback flavor line when neither of
+    // doInteract's special hide/reveal branches fires (see there) --
+    // interact stays 'use', not 'look', so those branches still get first go
     { id: 'shelf1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 0, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'shelf1' },
+      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'shelf1', lookKey: 'lookShelf1' },
     { id: 'shelf2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 2, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'shelf2' },
+      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'shelf2', lookKey: 'lookShelf2' },
 
     // couch (single 2-seat sofa sprite, not the two-piece L from the
     // original placeholder plan -- swap/add a second piece later if an
-    // actual corner sofa sprite shows up), coffee table in front, decor
+    // actual corner sofa sprite shows up), coffee table in front, decor.
+    // interact:'use' -- past era sits the kid down (see doInteract), present
+    // era just gets a look-flavor line
     { id: 'couch', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 2, y: 4, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'couch' },
+      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'couch' },
     { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 4, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'coffeeTable' },
     { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 5, y: 1, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'plant' },
+      push: false, blocking: true, stackable: false, interact: 'look', era: 'both', img: 'plant', lookKey: 'lookPlanterLiving' },
 
     // the drawing, lying on the table until the kid picks it up (see
     // doInteract's 'table' branch). Rendered relative to the table's own
@@ -374,11 +396,25 @@ function makeLivingEntities() {
     // doesn't know about attachedTo), so this ties with the table's depth
     // and the stable sort's insertion order (drawing listed after table)
     // breaks the tie in the drawing's favor, same trick the watch/
-    // nightstand pair uses in the bedroom
+    // nightstand pair uses in the bedroom.
+    // attachOffset is shifted back by a full AXIS_Y step (screen pixels for
+    // one grid step in +y) so it sits nearer the table's middle instead of
+    // right at its front edge -- x/y themselves don't move it (attachedTo
+    // rendering ignores the entity's own grid position, see drawEntity),
+    // only the pixel offset does.
     { id: 'drawing', cells: [{ dx: 0, dy: 0 }], x: 4, y: 5, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false, pickedUp: false,
-      attachedTo: 'table', attachOffset: { x: -25, y: -60 },
+      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x, y: -100 },
       interact: null, era: 'past', img: 'drawing' },
+
+    // the crayon the kid drew with, left sitting on top of the drawing --
+    // same x/y as 'drawing' (so it ties into the same table/drawing depth
+    // bucket) and listed right after it, so the stable sort draws it last
+    // of the three, i.e. visually on top of the paper
+    { id: 'crayon', cells: [{ dx: 0, dy: 0 }], x: 4, y: 5, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x + 45, y: -80 },
+      interact: null, era: 'past', img: 'crayon' },
 
     // the pouf the kid pushes to the shelf and climbs -- past only for now
     { id: 'puff', cells: [{ dx: 0, dy: 0 }], x: 5, y: 5, z: 0, height: 1,
@@ -386,11 +422,11 @@ function makeLivingEntities() {
 
     // present-only clutter blocking the path to the TV
     { id: 'box_living_1', cells: [{ dx: 0, dy: 0 }], x: 4, y: 1, z: 0, height: 1,
-      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
+      push: 'any', blocking: true, stackable: true, interact: 'look', era: 'present', img: 'box1x1', lookKey: 'lookBoxLiving1' },
     { id: 'box_living_2', cells: [{ dx: 0, dy: 0 }], x: 1, y: 1, z: 0, height: 1,
-      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
+      push: 'any', blocking: true, stackable: true, interact: 'look', era: 'present', img: 'box1x1', lookKey: 'lookBoxLiving2' },
     { id: 'box_living_3', cells: [{ dx: 0, dy: 0 }], x: 3, y: 5, z: 0, height: 1,
-      push: 'any', blocking: true, stackable: true, interact: null, era: 'present', img: 'box1x1' },
+      push: 'any', blocking: true, stackable: true, interact: 'look', era: 'present', img: 'box1x1', lookKey: 'lookBoxLiving3' },
 
     // return-to-corridor doorway -- see makeBedroomEntities for the same
     { id: 'door_corridor', cells: [{ dx: 0, dy: 0 }], x: -1, y: 5, z: 0, height: 1,
@@ -422,7 +458,32 @@ function makeCorridorEntities() {
       interact: 'use', era: 'both', doorTo: 'bedroom' },
     { id: 'door_living', cells: [{ dx: 0, dy: 0 }], x: 5, y: -1, z: 0, height: 1,
       push: false, blocking: false, stackable: false,
-      interact: 'use', era: 'both', doorTo: 'living' }
+      interact: 'use', era: 'both', doorTo: 'living' },
+
+    // the "arrival nook" -- a small table (reusing the living room's coffee
+    // table sprite; no dedicated art yet) where every collected item shows
+    // up, same attachedTo trick as the watch-on-nightstand/drawing-on-table.
+    // Interacting with this OR the coatrack ends the game once everything
+    // is collected (see doInteract) -- doesn't matter which one, so both
+    // just check the same two flags.
+    { id: 'corridor_table', cells: [{ dx: 0, dy: 0 }, { dx: 1, dy: 0 }], x: 2, y: 0, z: 0, height: 1,
+      push: false, blocking: true, stackable: false,
+      interact: 'use', era: 'both', img: 'coffeeTable' },
+
+    // trophies only exist once actually earned -- makeCorridorEntities()
+    // reruns fresh every time the corridor is (re)entered (see resetGame()),
+    // so this always reflects the current, persistent watchFound/drawingFound
+    // flags. x/y match corridor_table's own FRONT cell (not its origin) and
+    // these are listed after it, so the stable depth-sort tie always draws
+    // them on top of the table, exactly like the drawing-on-table pattern.
+    ...(watchFound ? [{ id: 'trophy_watch', cells: [{ dx: 0, dy: 0 }], x: 3, y: 0, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'corridor_table', attachOffset: { x: -30, y: -70 },
+      interact: null, era: 'both', img: 'watch' }] : []),
+    ...(drawingFound ? [{ id: 'trophy_drawing', cells: [{ dx: 0, dy: 0 }], x: 3, y: 0, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'corridor_table', attachOffset: { x: 30, y: -60 },
+      interact: null, era: 'both', img: 'drawing' }] : [])
   ];
 }
 
@@ -508,8 +569,14 @@ function switchRoom(roomId) {
 }
 
 let entities = [];
-let actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
+let actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 }, sitting: false };
 let undoStack = [];
+// achievement flags -- deliberately NOT reset in resetGame(), since they
+// must survive switchRoom() (which calls resetGame() on every door use,
+// including just walking back into an already-solved room). They gate the
+// corridor's trophy table/ending (see makeCorridorEntities, doInteract's
+// coatrack/corridor_table branch) as well as each room's own "already
+// solved" toasts (crib_present, wardrobe_present).
 let watchFound = false;
 let hasDrawing = false; // the kid is currently carrying the drawing (past, pre-hide)
 let drawingHidden = false; // the kid has hidden it in a shelf
@@ -524,13 +591,12 @@ function resetGame() {
   const cfg = ROOMS[currentRoomId];
   entities = cfg.makeEntities();
   era = 'present';
-  actor = { x: cfg.spawn.x, y: cfg.spawn.y, z: 0, facing: { ...cfg.spawn.facing } };
+  actor = { x: cfg.spawn.x, y: cfg.spawn.y, z: 0, facing: { ...cfg.spawn.facing }, sitting: false };
   undoStack = [];
-  watchFound = false; // only meaningful in the bedroom; harmless elsewhere
+  // watchFound/drawingFound are NOT reset here -- see their declaration above
   hasDrawing = false;
   drawingHidden = false;
   hiddenInShelfId = null;
-  drawingFound = false;
   drawingView = null;
 }
 
@@ -607,6 +673,11 @@ function isColorAnchor(e) {
   if (e.id === 'crib_present') return !watchFound;
   if (e.id === 'wardrobe_present') return watchFound;
   if (e.id === 'tv_present') return true; // TODO: gate on a "solved" flag once the room's puzzle exists
+  // collected keepsakes on the corridor table stay in color always -- both
+  // reuse desaturatable sprites ('watch', and 'coffeeTable' for the table
+  // itself), and without this they'd render fully gray since nothing else
+  // in the (always-present-era) corridor is ever a color anchor
+  if (e.id === 'trophy_watch' || e.id === 'trophy_drawing') return true;
   return false;
 }
 
@@ -694,30 +765,33 @@ function drawIntro() {
   noTint();
   textAlign(CENTER, CENTER);
   fill(255, 236, 200);
-  textSize(52);
-  text(t('title'), DESIGN_W / 2, DESIGN_H / 2 - 160);
+  textSize(68);
+  text(t('title'), DESIGN_W / 2, DESIGN_H / 2 - 175);
   fill(230);
-  textSize(20);
-  text(t('subtitle'), DESIGN_W / 2, DESIGN_H / 2 - 90);
+  textSize(28);
+  textWrap(WORD);
+  const subW = DESIGN_W * 0.72;
+  text(t('subtitle'), DESIGN_W / 2 - subW / 2, DESIGN_H / 2 - 108, subW); // (x,y) is the box's TOP-LEFT, not centered -- see drawToast's own note on this
+  textWrap(NORMAL);
 
   // a plain, understated prompt instead of a generic filled button -- fits
   // the antique/melancholy tone better than a rounded-rect UI widget
   const label = t('enter');
-  textSize(26);
+  textSize(34);
   const tw = textWidth(label);
-  const cx = DESIGN_W / 2, cy = DESIGN_H / 2 + 10;
-  const bw = tw + 80, bh = 56; // generous click/tap target around the text
+  const cx = DESIGN_W / 2, cy = DESIGN_H / 2 + 30;
+  const bw = tw + 90, bh = 64; // generous click/tap target around the text
   const bx = cx - bw / 2, by = cy - bh / 2;
   const hover = pointInRect(mouseDesign(), bx, by, bw, bh);
   fill(hover ? color(255, 230, 190) : color(220, 195, 160));
   text(label, cx, cy);
   stroke(hover ? color(255, 230, 190) : color(220, 195, 160));
   strokeWeight(1.5);
-  line(cx - tw / 2 - 14, cy + 22, cx + tw / 2 + 14, cy + 22);
+  line(cx - tw / 2 - 14, cy + 27, cx + tw / 2 + 14, cy + 27);
   noStroke();
   fill(170);
-  textSize(13);
-  text(t('enterHint'), cx, cy + 50);
+  textSize(17);
+  text(t('enterHint'), cx, cy + 60);
   introButton = { x: bx, y: by, w: bw, h: bh };
 
   pop();
@@ -782,7 +856,18 @@ function drawScene() {
   }
 
   {
-    const depth = (actor.x + actor.y) * 1000 + actor.z * 10 + 2;
+    // sitting pins the actor's depth to whatever it's sitting on, rather
+    // than its own (x,y) -- it no longer sits exactly on that entity's own
+    // depth-sort cell (see doInteract's couch branch), so without this the
+    // "always renders on top of the couch" guarantee would break
+    let depth;
+    if (actor.sitting) {
+      const seat = entities.find(en => en.id === 'couch');
+      const front = seat.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
+      depth = (seat.x + front.dx + seat.y + front.dy) * 1000 + seat.z * 10 + 2;
+    } else {
+      depth = (actor.x + actor.y) * 1000 + actor.z * 10 + 2;
+    }
     drawables.push({ depth, draw: () => drawActor() });
   }
 
@@ -993,9 +1078,12 @@ function drawActor() {
   if (actorTouchT > 0) actorTouchT = max(0, actorTouchT - deltaTime);
   const wobbleAmp = traits.wobbleAmp;
 
-  const pose = actorTouchT > 0 ? 'touch' : 'stand';
+  const pose = actorTouchT > 0 ? 'touch' : (actor.sitting ? 'sit' : 'stand');
   const { dir, mirror } = facingToSpriteDir(actor.facing);
-  const key = `${character}_${dir}_${pose}`;
+  // fall back to standing if this character has no sit art (only kid10
+  // does) -- shouldn't happen since only the past kid ever sits, but keeps
+  // an era-transition race from leaving the actor invisible
+  const key = images[`${character}_${dir}_${pose}`] ? `${character}_${dir}_${pose}` : `${character}_${dir}_stand`;
   const img = images[key];
   if (!img) return;
   const meta = metaFor(key); // scale is 1 here -- sprites are already sized 1:1 to the grid
@@ -1131,6 +1219,7 @@ let actionButton = null;
 // position/facing, entity state) can go here instead of a setTimeout that
 // only approximately lines up with the fade and shows a visible glitch.
 function startEraTransition(nextEra, action) {
+  actor.sitting = false; // any era change cancels sitting -- present-day man30 has no sit pose to fall back on
   transitioning = true;
   transitionT = 0;
   pendingEra = nextEra || null;
@@ -1300,6 +1389,14 @@ function tryStep(dir, pulling) {
 
   if (pulling) { tryPull(dir); return; }
 
+  if (actor.sitting) {
+    // sat down facing DIRS.left (see doInteract's couch branch) -- that's
+    // the only direction that gets up and walks away; everything else is
+    // ignored so the player can't wander off mid-sit in some other facing
+    if (!(dir.x === DIRS.left.x && dir.y === DIRS.left.y)) return;
+    actor.sitting = false;
+  }
+
   const tx = actor.x + dir.x, ty = actor.y + dir.y;
   actor.facing = dir;
 
@@ -1318,7 +1415,11 @@ function tryStep(dir, pulling) {
   // otherwise walking toward one would just stop cold at the boundary,
   // same as any other wall
   const doorHere = activeEntities().find(en => en.doorTo && en.cells.some(c => en.x + c.dx === tx && en.y + c.dy === ty));
-  if (doorHere) { switchRoom(doorHere.doorTo); return; }
+  if (doorHere) {
+    showToast(t(ROOM_NAME_KEYS[doorHere.doorTo] || 'roomBedroom'));
+    switchRoom(doorHere.doorTo);
+    return;
+  }
 
   if (!inBounds(tx, ty)) return;
 
@@ -1411,8 +1512,11 @@ function doInteract() {
   }
   if (e.id === 'wardrobe_present') {
     if (watchFound) {
+      // solved, but no game-over here anymore -- the ending now lives in
+      // the corridor (see doInteract's coatrack/corridor_table branch),
+      // once every room's item has been collected. The player just walks
+      // out through the door_corridor already in this room.
       showToast(t('wardrobeFoundToast'));
-      state = STATE.WIN;
     } else {
       showToast(t('wardrobeSearchToast'));
     }
@@ -1427,7 +1531,47 @@ function doInteract() {
     });
     return;
   }
-  if (e.doorTo) { switchRoom(e.doorTo); return; }
+  if (e.doorTo) {
+    // name the room you're stepping into -- the two corridor doors have no
+    // distinguishing art yet, and this also fires for the hidden
+    // door_corridor in each room, announcing "Corridor" on the way back
+    showToast(t(ROOM_NAME_KEYS[e.doorTo] || 'roomBedroom'));
+    switchRoom(e.doorTo);
+    return;
+  }
+  if (e.id === 'coatrack' || e.id === 'corridor_table') {
+    // the ending now lives here instead of the bedroom -- once every
+    // room's item is on the table, either object concludes the game
+    if (watchFound && drawingFound) {
+      state = STATE.WIN;
+    } else if (e.id === 'coatrack') {
+      showToast(t('lookCoatrack'));
+    } else {
+      showToast(t('corridorTableToast'));
+    }
+    return;
+  }
+  if (e.id === 'couch') {
+    if (era === 'past') {
+      if (!actor.sitting) {
+        actor.sitting = true;
+        // one step back (-y) from the couch's own front cell, landing in
+        // the middle of its 1x2 footprint instead of right at the front
+        // edge. This breaks the depth-sort tie that used to keep the actor
+        // drawn on top (see drawScene's actor-depth pin instead, which
+        // keys off actor.sitting rather than this position)
+        const front = e.cells.reduce((a, b) => (a.dx + a.dy > b.dx + b.dy ? a : b));
+        actor.x = e.x + front.dx; actor.y = e.y + front.dy - 1;
+        // faces away from the couch, screen south-west in this room's own
+        // axis calibration (DIRS.left here -- see computeDirs) -- the one
+        // direction tryStep() will later accept to stand back up and leave
+        actor.facing = { ...DIRS.left };
+      }
+    } else {
+      showToast(t('lookCouchLiving'));
+    }
+    return;
+  }
   if (e.id === 'table' && era === 'past') {
     if (!hasDrawing) {
       const drawing = entities.find(en => en.id === 'drawing');
@@ -1462,6 +1606,9 @@ function doInteract() {
       showToast(t('foundDrawingToast'));
       return;
     }
+    // neither special case applies right now -- just a generic look
+    showToast(t(e.lookKey));
+    return;
   }
   if (e.interact === 'look' && e.lookKey) {
     showToast(t(e.lookKey));
