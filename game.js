@@ -77,6 +77,10 @@ const STRINGS = {
     tvTouchToast: 'You touch the TV. The memory pulls you back.',
     lookCoatrack: 'Two coats hang here now. There used to be four.',
     pickupDrawingToast: "I finished it. I have to hide it before mom sees.",
+    hideDrawingToast: 'I tuck it in among the books.',
+    foundDrawingToast: "It's my family. But mom isn't in it.",
+    drawingBackToast: 'Mom is on this side.',
+    tapToContinue: 'Tap, click, or press Space',
     roomBedroom: 'Bedroom',
     roomLiving: 'Living room',
     roomCorridor: 'Corridor',
@@ -117,6 +121,10 @@ const STRINGS = {
     tvTouchToast: 'Megérinted a tévét. Az emlék visszahúz.',
     lookCoatrack: 'Két kabát lóg itt most. Régen négy volt.',
     pickupDrawingToast: 'Kész vagyok vele. El kell rejtsem, mielőtt anya meglátja.',
+    hideDrawingToast: 'Becsúsztatom a könyvek közé.',
+    foundDrawingToast: 'Ez itt a családom. De anya nincs rajta.',
+    drawingBackToast: 'Ezen az oldalon van anya.',
+    tapToContinue: 'Koppints, kattints, vagy nyomj Space-t',
     roomBedroom: 'Hálószoba',
     roomLiving: 'Nappali',
     roomCorridor: 'Folyosó',
@@ -159,6 +167,7 @@ function preload() {
   images.coffeeTable = loadImage('assets/sprites/dohanyzoasztal.png');
   images.plant = loadImage('assets/sprites/padlovirag.png');
   images.drawing = loadImage('assets/sprites/rajz.png');
+  images.drawingBack = loadImage('assets/sprites/rajz_hatoldal.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
@@ -338,11 +347,13 @@ function makeLivingEntities() {
     },
 
     // bookshelves, unchanged between eras for now (era: 'both') -- which
-    // one is "empty" vs "still full" is pending the real puzzle logic
+    // one is "empty" vs "still full" is pending the real puzzle logic.
+    // interact:'use' so they glow when faced -- see doInteract's shelf1/
+    // shelf2 branch for the hide-the-drawing (past) / find-it (present) logic
     { id: 'shelf1', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 0, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'shelf1' },
+      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'shelf1' },
     { id: 'shelf2', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 0, y: 2, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'shelf2' },
+      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'shelf2' },
 
     // couch (single 2-seat sofa sprite, not the two-piece L from the
     // original placeholder plan -- swap/add a second piece later if an
@@ -500,7 +511,13 @@ let entities = [];
 let actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
 let undoStack = [];
 let watchFound = false;
-let hasDrawing = false; // only meaningful in the living room; harmless elsewhere
+let hasDrawing = false; // the kid is currently carrying the drawing (past, pre-hide)
+let drawingHidden = false; // the kid has hidden it in a shelf
+let hiddenInShelfId = null; // which shelf -- present-day reveal only fires there
+let drawingFound = false; // the adult has finished viewing both sides
+let drawingView = null; // null | 'front' | 'back' -- the big reveal overlay
+let drawingViewStart = 0; // millis() the current side started showing
+const DRAWING_FLIP_DELAY = 1500; // ms before a flip input is honored
 const WATCH_GOAL = { x: 0, y: 0 }; // under the wardrobe
 
 function resetGame() {
@@ -511,6 +528,10 @@ function resetGame() {
   undoStack = [];
   watchFound = false; // only meaningful in the bedroom; harmless elsewhere
   hasDrawing = false;
+  drawingHidden = false;
+  hiddenInShelfId = null;
+  drawingFound = false;
+  drawingView = null;
 }
 
 function activeEntities() {
@@ -628,6 +649,7 @@ function draw() {
     drawScene();
     if (transitioning) drawFade();
     if (state === STATE.WIN) drawWinOverlay();
+    if (drawingView) drawDrawingOverlay();
   }
   drawToast();
   pop();
@@ -1148,6 +1170,46 @@ function drawWinOverlay() {
   text(t('winSubtitle'), DESIGN_W / 2, DESIGN_H / 2 + 16);
 }
 
+// The big reveal: the drawing was generated at high resolution specifically
+// so it can be shown large here, not just as the small world-space prop on
+// the table. front = family, no mom; back = mom, shown plain -- no
+// commentary, that's left for the actual player to feel, not the character
+// to narrate.
+function drawDrawingOverlay() {
+  fill(10, 10, 14, 215);
+  rect(0, 0, DESIGN_W, DESIGN_H);
+  const img = drawingView === 'front' ? images.drawing : images.drawingBack;
+  if (img) {
+    const maxW = DESIGN_W * 0.55, maxH = DESIGN_H * 0.55;
+    const s = min(maxW / img.width, maxH / img.height);
+    imageMode(CENTER);
+    image(img, DESIGN_W / 2, DESIGN_H / 2 - 30, img.width * s, img.height * s);
+  }
+  if (millis() - drawingViewStart >= DRAWING_FLIP_DELAY) {
+    fill(220, 210, 190, 170 + sin(millis() * 0.004) * 50);
+    textAlign(CENTER, CENTER);
+    textSize(15);
+    text(t('tapToContinue'), DESIGN_W / 2, DESIGN_H - 70);
+  }
+}
+
+// Advances the drawing-view overlay: front -> back -> closed. Shared by
+// click/tap (any input while viewing) and the specific keys the room's
+// other interactions already use. Returns whether it consumed the input.
+function handleDrawingViewInput() {
+  if (!drawingView) return false;
+  if (millis() - drawingViewStart < DRAWING_FLIP_DELAY) return true; // too soon, swallow it
+  if (drawingView === 'front') {
+    drawingView = 'back';
+    drawingViewStart = millis();
+    showToast(t('drawingBackToast'));
+  } else {
+    drawingView = null;
+    drawingFound = true;
+  }
+  return true;
+}
+
 /* ---------------- TOAST ---------------- */
 
 const TOAST_MULT = 3; // every toast stays up 3x as long as its base duration
@@ -1207,6 +1269,13 @@ function keyPressed() {
     return;
   }
   if (state !== STATE.PLAY || transitioning) return;
+  if (drawingView) {
+    // only the game's usual interact keys advance it via keyboard (a
+    // click/tap anywhere works too -- see handlePress); every other key
+    // is swallowed so it can't be mistaken for movement mid-reveal
+    if (key === ' ' || keyCode === ENTER || ['z', 'Z', 'x', 'X', 'c', 'C'].includes(key)) handleDrawingViewInput();
+    return;
+  }
   // dev-only room switch, stands in for the corridor hub until it exists
   if (key === '1') { switchRoom('bedroom'); return; }
   if (key === '2') { switchRoom('living'); return; }
@@ -1215,7 +1284,7 @@ function keyPressed() {
   else if (['ArrowLeft', 'a', 'A'].includes(key)) tryStep(DIRS.left, keyIsDown(16));
   else if (['ArrowDown', 's', 'S'].includes(key)) tryStep(DIRS.down, keyIsDown(16));
   else if (['ArrowUp', 'w', 'W'].includes(key)) tryStep(DIRS.up, keyIsDown(16));
-  else if (key === ' ' || keyCode === ENTER || ['z', 'Z', 'y', 'Y', 'x', 'X'].includes(key)) doInteract();
+  else if (key === ' ' || keyCode === ENTER || ['z', 'Z', 'y', 'Y', 'x', 'X', 'c', 'C'].includes(key)) doInteract();
 }
 
 function startGame() {
@@ -1231,13 +1300,18 @@ function tryStep(dir, pulling) {
 
   if (pulling) { tryPull(dir); return; }
 
-  // stepping off whatever the actor was standing on (the pouf, currently
-  // the only way z ever goes above 0) -- any movement input steps down
-  // first, then attempts the step normally at ground level
-  if (actor.z > 0) actor.z = 0;
-
   const tx = actor.x + dir.x, ty = actor.y + dir.y;
   actor.facing = dir;
+
+  // stepping off whatever the actor was standing on (the pouf, currently
+  // the only way z ever goes above 0) -- only if the target cell is
+  // actually walkable at ground level; otherwise stay put, elevated,
+  // rather than dropping straight down into whatever's still occupying
+  // that cell (e.g. the pouf's own footprint)
+  if (actor.z > 0) {
+    if (standable(tx, ty, 0)) { actor.z = 0; actor.x = tx; actor.y = ty; triggerWalk(); }
+    return;
+  }
 
   // doors sit just past the grid edge (a wall opening, not a walkable
   // tile), so check for one at the target cell BEFORE the inBounds gate --
@@ -1367,6 +1441,27 @@ function doInteract() {
     actor.z = 1;
     actor.x = e.x; actor.y = e.y; // stand exactly on the pouf's cell
     return;
+  }
+  if (e.id === 'shelf1' || e.id === 'shelf2') {
+    if (era === 'past' && actor.z > 0 && hasDrawing && !drawingHidden) {
+      hasDrawing = false;
+      drawingHidden = true;
+      hiddenInShelfId = e.id;
+      showToast(t('hideDrawingToast'));
+      setTimeout(() => {
+        startEraTransition('present', () => {
+          const spawn = ROOMS.living.spawn;
+          actor.x = spawn.x; actor.y = spawn.y; actor.facing = { ...spawn.facing }; actor.z = 0;
+        });
+      }, 1200);
+      return;
+    }
+    if (era === 'present' && drawingHidden && e.id === hiddenInShelfId && !drawingFound) {
+      drawingView = 'front';
+      drawingViewStart = millis();
+      showToast(t('foundDrawingToast'));
+      return;
+    }
   }
   if (e.interact === 'look' && e.lookKey) {
     showToast(t(e.lookKey));
@@ -1560,13 +1655,17 @@ function touchEnded() {
   if (!touchStart) return false;
   const dx = mouseX - touchStart.x, dy = mouseY - touchStart.y;
   touchStart = null;
-  if (state !== STATE.PLAY || transitioning) return false;
+  if (state !== STATE.PLAY || transitioning || drawingView) return false;
   if (abs(dx) < 30 && abs(dy) < 30) return false; // treat as tap, handled in handlePress
   tryStep(swipeToGridDir(dx, dy), false);
   return false;
 }
 
 function handlePress(px, py) {
+  // any click/tap anywhere advances the drawing reveal once it's up --
+  // takes priority over every other button/world hit-test
+  if (drawingView) { handleDrawingViewInput(); return; }
+
   // screen-space UI (see uiSize()) -- checked against raw px,py, not the
   // design-space coordinates the world/intro button below uses
   const raw = { x: px, y: py };
