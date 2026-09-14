@@ -104,7 +104,7 @@
 const SPRITES = [
   'crib','bed','nightstand','wardrobe','wardrobeEmpty','watch','box1x1','box1x2',
   'shelf1','shelf2','tvOn','tvOff','couch','puff','coffeeTable','plant','drawing',
-  'console','controller','cartridges',
+  'console','controller','cartridges','crayon',
   'man30_ne_stand','man30_ne_touch','man30_se_stand','man30_se_touch',
   'kid2_ne_stand','kid2_ne_touch','kid2_se_stand','kid2_se_touch',
   'kid10_ne_stand','kid10_ne_touch','kid10_ne_sit',
@@ -131,6 +131,7 @@ const SPRITE_FILES = {
   console: '../assets/sprites/8bitkonzol.png',
   controller: '../assets/sprites/kontroller.png',
   cartridges: '../assets/sprites/cartridges.png',
+  crayon: '../assets/sprites/zsirkreta.png',
   man30_ne_stand: '../assets/sprites/man30_ne_stand.png',
   man30_ne_touch: '../assets/sprites/man30_ne_touch.png',
   man30_se_stand: '../assets/sprites/man30_se_stand.png',
@@ -146,8 +147,8 @@ const SPRITE_FILES = {
   kid10_se_touch: '../assets/sprites/kid10_se_touch.png',
   kid10_se_sit: '../assets/sprites/kid10_se_sit.png'
 };
-const ROOM_FILES = { room: '../assets/room/halo.png', living: '../assets/room/nappali.png' };
-const ROOM_LABELS = { room: 'Hálószoba', living: 'Nappali' };
+const ROOM_FILES = { room: '../assets/room/halo.png', living: '../assets/room/nappali.png', corridor: '../assets/room/folyoso.png' };
+const ROOM_LABELS = { room: 'Hálószoba', living: 'Nappali', corridor: 'Folyosó' };
 // JSON key each room's calibration lives under -- 'room' keeps the
 // original unprefixed '_room' for backward compatibility with existing
 // sprites.json files, every other room gets its own '_room_<key>' block.

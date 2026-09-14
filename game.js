@@ -188,6 +188,9 @@ function preload() {
   images.controller = loadImage('assets/sprites/kontroller.png');
   images.cartridges = loadImage('assets/sprites/cartridges.png');
   images.crayon = loadImage('assets/sprites/zsirkreta.png');
+  images.livingLightmap = loadImage('assets/room/nappali_lightmap.png');
+  images.corridorPlate = loadImage('assets/room/folyoso.png');
+  images.corridorLightmap = loadImage('assets/room/folyoso_lightmap.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
@@ -378,10 +381,6 @@ function makeLivingEntities() {
       push: false, blocking: false, stackable: false,
       attachedTo: 'tv_past', attachOffset: { x: 90, y: -35 },
       interact: null, era: 'past', img: 'console' },
-    { id: 'controller', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 0.1,
-      push: false, blocking: false, stackable: false,
-      attachedTo: 'tv_past', attachOffset: { x: 70, y: 5 },
-      interact: null, era: 'past', img: 'controller' },
     { id: 'cartridges', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false,
       attachedTo: 'tv_past', attachOffset: { x: 125, y: -15 },
@@ -406,6 +405,15 @@ function makeLivingEntities() {
     // era just gets a look-flavor line
     { id: 'couch', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 2, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'couch' },
+
+    // the controller, left on the couch where the kid actually sits to
+    // play -- past only, same depth-tie trick as the other attached props
+    // (x/y match the couch's own front cell, listed right after it)
+    { id: 'controller', cells: [{ dx: 0, dy: 0 }], x: 2, y: 5, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'couch', attachOffset: { x: 0, y: -40 },
+      interact: null, era: 'past', img: 'controller' },
+
     { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 4, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'coffeeTable' },
     { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 5, y: 1, z: 0, height: 1,
@@ -437,7 +445,7 @@ function makeLivingEntities() {
     // of the three, i.e. visually on top of the paper
     { id: 'crayon', cells: [{ dx: 0, dy: 0 }], x: 4, y: 5, z: 0, height: 0.1,
       push: false, blocking: false, stackable: false,
-      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x + 45, y: -80 },
+      attachedTo: 'table', attachOffset: { x: -25 - AXIS_Y.x + 45, y: -100 },
       interact: null, era: 'past', img: 'crayon' },
 
     // the pouf the kid pushes to the shelf and climbs -- past only for now
@@ -529,7 +537,7 @@ const ROOMS = {
     // sprites.json (see applyRoomConfig)
     gridW: 7, gridH: 7, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
     originPx: { x: 720, y: 395 },
-    plateImg: 'livingPlate', lightmapImg: null,
+    plateImg: 'livingPlate', lightmapImg: 'livingLightmap',
     spritesJsonKey: '_room_living',
     makeEntities: makeLivingEntities,
     spawn: { x: 1, y: 4, facing: { x: 1, y: 0 } },
@@ -541,7 +549,7 @@ const ROOMS = {
     // living room started in.
     gridW: 7, gridH: 3, axisX: { x: 100.4, y: 50.4 }, axisY: { x: -100.4, y: 50.4 },
     originPx: { x: 720, y: 395 },
-    plateImg: null, lightmapImg: null,
+    plateImg: 'corridorPlate', lightmapImg: 'corridorLightmap',
     spritesJsonKey: '_room_corridor',
     makeEntities: makeCorridorEntities,
     spawn: { x: 3, y: 1, facing: { x: 0, y: -1 } },
