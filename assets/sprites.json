@@ -40,8 +40,8 @@
   },
   "wardrobe": {
     "anchor": {
-      "x": 0.653,
-      "y": 1
+      "x": 0.69,
+      "y": 0.989
     },
     "scale": 1
   },
@@ -119,6 +119,88 @@
     "anchor": {
       "x": 0.372,
       "y": 0.839
+    },
+    "scale": 1
+  },
+  "_room_living": {
+    "originPx": {
+      "x": 720.9,
+      "y": 380
+    },
+    "gridN": 6,
+    "axisX": {
+      "x": -87.329,
+      "y": 43.354
+    },
+    "axisY": {
+      "x": 87.081,
+      "y": 42.981
+    },
+    "tileW": 174.41,
+    "tileH": 86.34,
+    "gridW": 7,
+    "gridH": 7
+  },
+  "kid10_ne_stand": {
+    "anchor": {
+      "x": 0.43,
+      "y": 0.883
+    },
+    "scale": 1
+  },
+  "kid10_ne_touch": {
+    "anchor": {
+      "x": 0.337,
+      "y": 0.877
+    },
+    "scale": 1
+  },
+  "kid10_ne_sit": {
+    "anchor": {
+      "x": 0.483,
+      "y": 0.873
+    },
+    "scale": 1
+  },
+  "kid10_se_stand": {
+    "anchor": {
+      "x": 0.532,
+      "y": 0.883
+    },
+    "scale": 1
+  },
+  "kid10_se_touch": {
+    "anchor": {
+      "x": 0.421,
+      "y": 0.899
+    },
+    "scale": 1
+  },
+  "kid10_se_sit": {
+    "anchor": {
+      "x": 0.571,
+      "y": 0.894
+    },
+    "scale": 1
+  },
+  "wardrobeEmpty": {
+    "anchor": {
+      "x": 0.71,
+      "y": 0.963
+    },
+    "scale": 1
+  },
+  "shelf1": {
+    "anchor": {
+      "x": 0.672,
+      "y": 1.002
+    },
+    "scale": 1
+  },
+  "shelf2": {
+    "anchor": {
+      "x": 0.69,
+      "y": 1.013
     },
     "scale": 1
   }
