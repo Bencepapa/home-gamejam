@@ -203,5 +203,54 @@
       "y": 1.013
     },
     "scale": 1
+  },
+  "tvOn": {
+    "anchor": {
+      "x": 0.594,
+      "y": 0.978
+    },
+    "scale": 1
+  },
+  "tvOff": {
+    "anchor": {
+      "x": 0.597,
+      "y": 0.975
+    },
+    "scale": 1
+  },
+  "couch": {
+    "anchor": {
+      "x": 0.669,
+      "y": 0.979
+    },
+    "scale": 1
+  },
+  "puff": {
+    "anchor": {
+      "x": 0.5,
+      "y": 0.969
+    },
+    "scale": 1
+  },
+  "coffeeTable": {
+    "anchor": {
+      "x": 0.646,
+      "y": 0.945
+    },
+    "scale": 1
+  },
+  "plant": {
+    "anchor": {
+      "x": 0.459,
+      "y": 1.136
+    },
+    "scale": 1
+  },
+  "drawing": {
+    "anchor": {
+      "x": 0.5,
+      "y": 0.9
+    },
+    "scale": 0.189
   }
 }

@@ -76,6 +76,7 @@ const STRINGS = {
     lookTV: 'My favorite game is Ice Climber.',
     tvTouchToast: 'You touch the TV. The memory pulls you back.',
     lookCoatrack: 'Two coats hang here now. There used to be four.',
+    pickupDrawingToast: "I finished it. I have to hide it before mom sees.",
     roomBedroom: 'Bedroom',
     roomLiving: 'Living room',
     roomCorridor: 'Corridor',
@@ -115,6 +116,7 @@ const STRINGS = {
     lookTV: 'A kedvenc játékom az Ice Climber.',
     tvTouchToast: 'Megérinted a tévét. Az emlék visszahúz.',
     lookCoatrack: 'Két kabát lóg itt most. Régen négy volt.',
+    pickupDrawingToast: 'Kész vagyok vele. El kell rejtsem, mielőtt anya meglátja.',
     roomBedroom: 'Hálószoba',
     roomLiving: 'Nappali',
     roomCorridor: 'Folyosó',
@@ -156,6 +158,7 @@ function preload() {
   images.puff = loadImage('assets/sprites/puff.png');
   images.coffeeTable = loadImage('assets/sprites/dohanyzoasztal.png');
   images.plant = loadImage('assets/sprites/padlovirag.png');
+  images.drawing = loadImage('assets/sprites/rajz.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
   images.box1x1 = loadImage('assets/sprites/doboz_1x1.png');
@@ -347,13 +350,28 @@ function makeLivingEntities() {
     { id: 'couch', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 2, y: 4, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'couch' },
     { id: 'table', cells: [{ dx: 0, dy: 0 }, { dx: 0, dy: 1 }], x: 4, y: 4, z: 0, height: 1,
-      push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'coffeeTable' },
+      push: false, blocking: true, stackable: false, interact: 'use', era: 'both', img: 'coffeeTable' },
     { id: 'planter', cells: [{ dx: 0, dy: 0 }], x: 5, y: 1, z: 0, height: 1,
       push: false, blocking: true, stackable: false, interact: null, era: 'both', img: 'plant' },
 
+    // the drawing, lying on the table until the kid picks it up (see
+    // doInteract's 'table' branch). Rendered relative to the table's own
+    // anchor (attachedTo), scaled to ~1/3 of the table's width. pickedUp
+    // is checked by activeEntities() -- once true, it's gone for good.
+    // x/y deliberately match the table's OWN front cell (4,5), not its
+    // (4,4) anchor -- depth-sorting is keyed off an entity's own x/y (it
+    // doesn't know about attachedTo), so this ties with the table's depth
+    // and the stable sort's insertion order (drawing listed after table)
+    // breaks the tie in the drawing's favor, same trick the watch/
+    // nightstand pair uses in the bedroom
+    { id: 'drawing', cells: [{ dx: 0, dy: 0 }], x: 4, y: 5, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false, pickedUp: false,
+      attachedTo: 'table', attachOffset: { x: -25, y: -60 },
+      interact: null, era: 'past', img: 'drawing' },
+
     // the pouf the kid pushes to the shelf and climbs -- past only for now
     { id: 'puff', cells: [{ dx: 0, dy: 0 }], x: 5, y: 5, z: 0, height: 1,
-      push: 'any', blocking: true, stackable: true, interact: null, era: 'past', img: 'puff' },
+      push: 'any', blocking: true, stackable: true, interact: 'use', era: 'past', img: 'puff' },
 
     // present-only clutter blocking the path to the TV
     { id: 'box_living_1', cells: [{ dx: 0, dy: 0 }], x: 4, y: 1, z: 0, height: 1,
@@ -482,6 +500,7 @@ let entities = [];
 let actor = { x: 0, y: 4, z: 0, facing: { x: 1, y: 0 } };
 let undoStack = [];
 let watchFound = false;
+let hasDrawing = false; // only meaningful in the living room; harmless elsewhere
 const WATCH_GOAL = { x: 0, y: 0 }; // under the wardrobe
 
 function resetGame() {
@@ -491,10 +510,11 @@ function resetGame() {
   actor = { x: cfg.spawn.x, y: cfg.spawn.y, z: 0, facing: { ...cfg.spawn.facing } };
   undoStack = [];
   watchFound = false; // only meaningful in the bedroom; harmless elsewhere
+  hasDrawing = false;
 }
 
 function activeEntities() {
-  return entities.filter(e => e.era === era || e.era === 'both');
+  return entities.filter(e => (e.era === era || e.era === 'both') && !e.pickedUp);
 }
 
 function entityAt(x, y, z, filterFn) {
@@ -1211,6 +1231,11 @@ function tryStep(dir, pulling) {
 
   if (pulling) { tryPull(dir); return; }
 
+  // stepping off whatever the actor was standing on (the pouf, currently
+  // the only way z ever goes above 0) -- any movement input steps down
+  // first, then attempts the step normally at ground level
+  if (actor.z > 0) actor.z = 0;
+
   const tx = actor.x + dir.x, ty = actor.y + dir.y;
   actor.facing = dir;
 
@@ -1329,6 +1354,20 @@ function doInteract() {
     return;
   }
   if (e.doorTo) { switchRoom(e.doorTo); return; }
+  if (e.id === 'table' && era === 'past') {
+    if (!hasDrawing) {
+      const drawing = entities.find(en => en.id === 'drawing');
+      if (drawing) drawing.pickedUp = true;
+      hasDrawing = true;
+      showToast(t('pickupDrawingToast'));
+    }
+    return;
+  }
+  if (e.id === 'puff' && era === 'past') {
+    actor.z = 1;
+    actor.x = e.x; actor.y = e.y; // stand exactly on the pouf's cell
+    return;
+  }
   if (e.interact === 'look' && e.lookKey) {
     showToast(t(e.lookKey));
     return;
