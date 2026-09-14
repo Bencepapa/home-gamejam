@@ -184,6 +184,9 @@ function preload() {
   images.plant = loadImage('assets/sprites/padlovirag.png');
   images.drawing = loadImage('assets/sprites/rajz.png');
   images.drawingBack = loadImage('assets/sprites/rajz_hatoldal.png');
+  images.console = loadImage('assets/sprites/8bitkonzol.png');
+  images.controller = loadImage('assets/sprites/kontroller.png');
+  images.cartridges = loadImage('assets/sprites/cartridges.png');
   images.crayon = loadImage('assets/sprites/zsirkreta.png');
   images.nightstand = loadImage('assets/sprites/ejjelisz.png');
   images.watch = loadImage('assets/sprites/ora.png');
@@ -362,6 +365,27 @@ function makeLivingEntities() {
       img: 'tvOn',
       lookKey: 'lookTV'
     },
+
+    // NES-era console/controller/cartridges -- attached decoration on the
+    // TV stand, past only (matches "the NES is gone" in the present).
+    // Non-blocking and attached rather than separate grid cells, so they
+    // don't eat into the floor space next to the TV -- the pouf (or
+    // anything else) can still be pushed right up against it. x/y tie
+    // their depth-sort key to tv_past's own front cell (same trick as the
+    // watch/nightstand and drawing/table pairs), broken by insertion
+    // order since they're listed after it.
+    { id: 'console', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'tv_past', attachOffset: { x: 90, y: -35 },
+      interact: null, era: 'past', img: 'console' },
+    { id: 'controller', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'tv_past', attachOffset: { x: 70, y: 5 },
+      interact: null, era: 'past', img: 'controller' },
+    { id: 'cartridges', cells: [{ dx: 0, dy: 0 }], x: 3, y: 1, z: 0, height: 0.1,
+      push: false, blocking: false, stackable: false,
+      attachedTo: 'tv_past', attachOffset: { x: 125, y: -15 },
+      interact: null, era: 'past', img: 'cartridges' },
 
     // bookshelves, unchanged between eras for now (era: 'both') -- which
     // one is "empty" vs "still full" is pending the real puzzle logic.

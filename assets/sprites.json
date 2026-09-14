@@ -259,5 +259,26 @@
       "y": 0.9
     },
     "scale": 0.6
+  },
+  "console": {
+    "anchor": {
+      "x": 0.5,
+      "y": 0.9
+    },
+    "scale": 1
+  },
+  "controller": {
+    "anchor": {
+      "x": 0.5,
+      "y": 0.9
+    },
+    "scale": 1
+  },
+  "cartridges": {
+    "anchor": {
+      "x": 0.5,
+      "y": 0.9
+    },
+    "scale": 1
   }
 }
